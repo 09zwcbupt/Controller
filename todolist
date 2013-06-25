@@ -1,0 +1,7 @@
+To do list:
+1 OF协议封装
+	1.1 Header中的Type信息如何与Payload中的message type自动对应？
+	1.2 Header中的length信息如何自动对应（定长、变长）
+2 单线程Agent
+	1.1 OpenFlow交换机与控制器的会话逻辑
+3 并行架构
