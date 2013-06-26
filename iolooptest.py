@@ -5,32 +5,53 @@ import tornado.iostream as iostream
 import socket
 import openflow_header as of
 
-def connection_ready(sock, fd, events):
-    #while True:
-        try:
-            connection, address = sock.accept()
-        except socket.error, e:
-            if e.args[0] not in (errno.EWOULDBLOCK, errno.EAGAIN):
-                raise
-            return
-        connection.setblocking(0)
-        handle_connection(connection, address)
-        stream = iostream.IOStream(connection)
-        stream.read_bytes(8, print_on_screen)
-        #generate a openflow message. by default, it's a OFP_HELLO msg
-        msg = of.ofp_header()
-        
-        #the 'stream.write' needs string
-        stream.write(str(msg))
-        print "send OFP_HELLO"
+import Queue
 
-def print_on_screen(data):
-    print "received something"
-    rmsg = of.ofp_header(data)
-    rmsg.show()
+fd_map = {}
+message_queue_map = {}
 
 def handle_connection(connection, address):
         print "1 connection,", connection, address
+
+
+def client_handler(address, fd, events):
+    sock = fd_map[fd]
+    #print sock, sock.getpeername(), sock.getsockname()
+    if events & io_loop.READ:
+        data = sock.recv(1024)
+        if data:
+            rmsg = of.ofp_header(data)
+            print "received from host."
+            rmsg.show()
+            if rmsg.type == 0:
+                print "OFPT_HELLO"
+                io_loop.update_handler(fd, io_loop.WRITE)
+                message_queue_map[sock].put(data)
+
+    if events & io_loop.WRITE:
+        try:
+            next_msg = message_queue_map[sock].get_nowait()
+        except Queue.Empty:
+            print "%s queue empty" % str(address)
+            io_loop.update_handler(fd, io_loop.READ)
+        else:
+            print 'sending "%s" to %s' % (next_msg, address)
+            sock.send(next_msg)
+
+def agent(sock, fd, events):
+    #print fd, sock, events
+    try:
+        connection, address = sock.accept()
+    except socket.error, e:
+        if e.args[0] not in (errno.EWOULDBLOCK, errno.EAGAIN):
+            raise
+        return
+    connection.setblocking(0)
+    handle_connection(connection, address)
+    fd_map[connection.fileno()] = connection
+    client_handle = functools.partial(client_handler, address)
+    io_loop.add_handler(connection.fileno(), client_handle, io_loop.READ)
+    message_queue_map[connection] = Queue.Queue()
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
 sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -39,6 +60,8 @@ sock.bind(("", 6633))
 sock.listen(6633)
 
 io_loop = ioloop.IOLoop.instance()
-callback = functools.partial(connection_ready, sock)
+#callback = functools.partial(connection_ready, sock)
+callback = functools.partial(agent, sock)
+print sock, sock.getsockname()
 io_loop.add_handler(sock.fileno(), callback, io_loop.READ)
 io_loop.start()
