@@ -30,11 +30,35 @@ class ofp_header(Packet):
                          20: "OFPT_QUEUE_GET_CONFIG_REQUEST",
                          21: "OFPT_QUEUE_GET_CONFIG_REPLY",
                          #Messages for circuit switched ports
-                         255: "OFPT_CFLOW_MOD",
+                         #255: "OFPT_CFLOW_MOD",
                      }),
                  ShortField("length",8),
                  IntField("xid" , 1) ]
 
+#OFP_HELLO, OFP_ECHO_REQUEST and OFP_FEATURES_REQUEST do not have a body.
+
+class ofp_features_reply(Packet):
+    name = "OpenFlow Switch Features Reply"
+    """
+    If the field is number has some meaning, and have to use ``show()`` to present
+    better not use things in Simple datatypes like ``LongField`` or ``IEEEDoubleField``
+    those field will automatically convert your data into some unreadable numbers
+    For presenting, just use ``BitFieldLenField``, parameters are name, default
+    value, length(in bits) and something I don't know.
+    """
+    fields_desc=[ BitFieldLenField('datapath_id', None, 64, length_of='varfield'),
+                  BitFieldLenField('n_buffers', None, 32, length_of='varfield'),
+                  XByteField("n_tables", 0),
+                  XByteField("pad", 0),
+                  XByteField("pad", 0),
+                  XByteField("pad", 0),
+                  #features
+                  BitFieldLenField('capabilities', None, 32, length_of='varfield'),
+                  BitFieldLenField('actions', None, 32, length_of='varfield'),
+                  #port info can be resoved at TCP server
+                ]
+
+bind_layers( ofp_header, ofp_features_reply, type=6 )
 
 if __name__ == '__main__':
     a = ofp_header()
@@ -46,3 +70,17 @@ if __name__ == '__main__':
     a.show()
     a.type = 17
     a.show()
+
+    print "\n testing for the OFP_FEATURES_REPLY msg"
+    b = ofp_header()/ofp_features_reply()
+    b.show()
+    c = str(b)
+    print len(c)
+    c = c + "AAAAAAAAAAAAAAAAAAAAAAA"
+    d = ofp_header(c)
+    d.show()
+    print len(c)
+    
+    #if using part of received data, length can be devide by 8 is a must
+    d = ofp_features_reply(c[0:39])
+    d.show()

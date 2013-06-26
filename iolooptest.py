@@ -3,7 +3,7 @@ import functools
 import tornado.ioloop as ioloop
 import tornado.iostream as iostream
 import socket
-import openflow_header as of
+import libopenflow as of
 
 import Queue
 
@@ -21,12 +21,17 @@ def client_handler(address, fd, events):
         data = sock.recv(1024)
         if data:
             rmsg = of.ofp_header(data)
-            print "received from host."
-            rmsg.show()
+            print "received", rmsg.type, "from host."
+            #rmsg.show()
             if rmsg.type == 0:
                 print "OFPT_HELLO"
+                msg = of.ofp_header(type = 5)
                 io_loop.update_handler(fd, io_loop.WRITE)
                 message_queue_map[sock].put(data)
+                message_queue_map[sock].put(str(msg))
+            if rmsg.type == 6:
+                print "OFPT_FEATURES_REPLY"
+                rmsg.show()
 
     if events & io_loop.WRITE:
         try:

@@ -1,6 +1,6 @@
 import Queue
 import socket
-import openflow_header
+import libopenflow
 from functools import partial
 from tornado.ioloop import IOLoop
 
