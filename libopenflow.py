@@ -2,6 +2,17 @@ import sys
 sys.path.append('/opt/local/Library/Frameworks/Python.framework/Versions/2.7/lib/python2.7/site-packages/')
 from scapy.all import *
 
+#uint8_t => XByteField
+#uint16_t => ShortField, BitFieldLenField('name', None, 16, length_of='varfield')
+#uint32_t => IntField, BitFieldLenField('name', None, 32, length_of='varfield'),
+
+class ofp_phy_port(Packet):
+    name = "OpenFlow Port"
+    fields_desc=[ ShortField("port_no", 0),
+                  MACField("hw_addr", 0),
+                  #and more
+                ]
+
 class ofp_header(Packet):
     name = "OpenFlow Header "
     fields_desc=[ XByteField("version",1),

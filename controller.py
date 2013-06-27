@@ -36,6 +36,9 @@ def client_handler(address, fd, events):
             if rmsg.type == 6:
                 print "OFPT_FEATURES_REPLY"
                 rmsg.show()
+                #print "rmsg.load:",rmsg.load
+                port_info = of.ofp_phy_port(rmsg.load)
+                port_info.show()
             if rmsg.type == 2:
                 print "OFPT_ECHO_REQUEST"
             if rmsg.type == 3:
