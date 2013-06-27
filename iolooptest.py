@@ -21,7 +21,7 @@ def client_handler(address, fd, events):
         data = sock.recv(1024)
         if data:
             rmsg = of.ofp_header(data)
-            print "received", rmsg.type, "from host."
+            #print "received", rmsg.type, "from host."
             #rmsg.show()
             if rmsg.type == 0:
                 print "OFPT_HELLO"
@@ -29,9 +29,51 @@ def client_handler(address, fd, events):
                 io_loop.update_handler(fd, io_loop.WRITE)
                 message_queue_map[sock].put(data)
                 message_queue_map[sock].put(str(msg))
+            if rmsg.type == 1:
+                print "OFPT_ERROR"
+            if rmsg.type == 5:
+                print "OFPT_FEATURES_REQUEST"
             if rmsg.type == 6:
                 print "OFPT_FEATURES_REPLY"
                 rmsg.show()
+            if rmsg.type == 2:
+                print "OFPT_ECHO_REQUEST"
+            if rmsg.type == 3:
+                print "OFPT_ECHO_REPLY"
+            if rmsg.type == 4:
+                print "OFPT_VENDOR"
+            if rmsg.type == 6:
+                print "OFPT_FEATURES_REPLY"
+            if rmsg.type == 7:
+                print "OFPT_GET_CONFIG_REQUEST"
+            if rmsg.type == 8:
+                print "OFPT_GET_CONFIG_REPLY"
+            if rmsg.type == 9:
+                print "OFPT_SET_CONFIG"
+            if rmsg.type == 10:
+                print "OFPT_PACKET_IN"
+            if rmsg.type == 11: 
+                print "OFPT_FLOW_REMOVED"
+            if rmsg.type == 12:
+                print "OFPT_PORT_STATUS"
+            if rmsg.type == 13:
+                print "OFPT_PACKET_OUT"
+            if rmsg.type == 14:
+                print "OFPT_FLOW_MOD"
+            if rmsg.type == 15:
+                print "OFPT_PORT_MOD"
+            if rmsg.type == 16:
+                print "OFPT_STATS_REQUEST"
+            if rmsg.type == 17:
+                print "OFPT_STATS_REPLY"
+            if rmsg.type == 18:
+                print "OFPT_BARRIER_REQUEST"
+            if rmsg.type == 19:
+                print "OFPT_BARRIER_REPLY"
+            if rmsg.type == 20:
+                print "OFPT_QUEUE_GET_CONFIG_REQUEST"
+            if rmsg.type == 21:
+                print "OFPT_QUEUE_GET_CONFIG_REPLY"
 
     if events & io_loop.WRITE:
         try:
@@ -40,7 +82,7 @@ def client_handler(address, fd, events):
             print "%s queue empty" % str(address)
             io_loop.update_handler(fd, io_loop.READ)
         else:
-            print 'sending "%s" to %s' % (next_msg, address)
+            print 'sending "%s" to %s' % (of.ofp_header(next_msg).type, address)
             sock.send(next_msg)
 
 def agent(sock, fd, events):
