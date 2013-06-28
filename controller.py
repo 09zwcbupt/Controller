@@ -35,10 +35,18 @@ def client_handler(address, fd, events):
                 print "OFPT_FEATURES_REQUEST"
             if rmsg.type == 6:
                 print "OFPT_FEATURES_REPLY"
-                rmsg.show()
-                #print "rmsg.load:",rmsg.load
-                port_info = of.ofp_phy_port(rmsg.load)
-                port_info.show()
+                print "rmsg.load:",len(rmsg.load)/48
+                port_info = {}
+                for i in range(len(rmsg.load)/48):
+                    #print "port", i, ":"
+                    """The port structure has a length of 48 bytes.
+                       so when reciving port info, firse split the list
+                       into port structure length and then analysis
+                    """
+                    port_info[i] = of.ofp_phy_port(rmsg.load[0+i*48:47+i*48])
+                    #print port_info[i].port_name
+                    #port_info[i].show()
+                    #print port_info[i].OFPPC_PORT_DOWN
             if rmsg.type == 2:
                 print "OFPT_ECHO_REQUEST"
             if rmsg.type == 3:

@@ -10,7 +10,45 @@ class ofp_phy_port(Packet):
     name = "OpenFlow Port"
     fields_desc=[ ShortField("port_no", 0),
                   MACField("hw_addr", 0),
-                  #and more
+                  StrField("port_name", None, fmt="H", remain=24),
+                  #TODO: still some problem with this part
+                  #uint32_t for port config, for Openflow 1.0, this part only uses 7 bits.
+                  BitField("OFPPC_PORT_DOWN", None, 1),
+                  BitField("OFPPC_NO_STP", 0, 1),
+                  BitField("OFPPC_NO_RECV", 0, 1),
+                  BitField("OFPPC_NO_RECV_STP",0, 1),
+                  BitField("OFPPC_NO_FLOOD", 0, 1),
+                  BitField("OFPPC_NO_FWD", 0, 1),
+                  BitField("OFPPC_NO_PACKET_IN", 0, 1),
+                  BitField("config not defined", 0, 25),
+
+                  #uint32_t for state
+                  BitField("OFPPS_LINK_DOWN", 0, 1),
+                  BitField("else", 0, 31),
+
+                  #uint32_t for Current features
+                  BitField("OFPPF_10MB_HD", 0, 1),
+                  BitField("OFPPF_10MB_FD", 0, 1),
+                  BitField("OFPPF_100MB_HD", 0, 1),
+                  BitField("OFPPF_100MB_FD", 0, 1),
+                  BitField("OFPPF_1GB_HD", 0, 1),
+                  BitField("OFPPF_1GB_FD", 0, 1),
+                  BitField("OFPPF_10GB_FD", 0, 1),
+                  BitField("OFPPF_COPPER", 0, 1),
+                  BitField("OFPPF_FIBER", 0, 1),
+                  BitField("OFPPF_AUTONEG", 0, 1),
+                  BitField("OFPPF_PAUSE", 0, 1),
+                  BitField("OFPPF_PAUSE_ASYM", 0, 1),
+                  BitField("curr_not defined", 0, 20),
+
+                  #uint32_t for features being advised by the port
+                  BitField("advertised", 0, 32),
+
+                  #uint32_t for features supported by the port
+                  BitField("supported", 0, 32),
+ 
+                  #uint32_t for features advertised by peer
+                  BitField("peer", 0, 32)
                 ]
 
 class ofp_header(Packet):
