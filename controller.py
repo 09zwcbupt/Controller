@@ -20,8 +20,14 @@ def client_handler(address, fd, events):
     if events & io_loop.READ:
         data = sock.recv(1024)
         if data:
-            rmsg = of.ofp_header(data)
-            #print "received", rmsg.type, "from host."
+            #print len(data)
+            #if the data length is 8, then only of header
+            #else, there are payload after the header
+            if len(data)>8:
+                rmsg = of.ofp_header(data[0:8])
+                body = data[8:]
+            else:
+                rmsg = of.ofp_header(data)
             #rmsg.show()
             if rmsg.type == 0:
                 print "OFPT_HELLO"
@@ -35,20 +41,26 @@ def client_handler(address, fd, events):
                 print "OFPT_FEATURES_REQUEST"
             if rmsg.type == 6:
                 print "OFPT_FEATURES_REPLY"
-                print "rmsg.load:",len(rmsg.load)/48
+                #print "rmsg.load:",len(body)/48
+                msg = of.ofp_features_reply(body[0:24])#lenth of reply msg
+                #msg.show()
+                port_info_raw = body[24:]
                 port_info = {}
-                for i in range(len(rmsg.load)/48):
+                for i in range(len(port_info_raw)/48):
                     #print "port", i, ":"
                     """The port structure has a length of 48 bytes.
                        so when reciving port info, firse split the list
                        into port structure length and then analysis
                     """
-                    port_info[i] = of.ofp_phy_port(rmsg.load[0+i*48:47+i*48])
+                    port_info[i] = of.ofp_phy_port(port_info_raw[0+i*48:47+i*48])
                     #print port_info[i].port_name
                     #port_info[i].show()
                     #print port_info[i].OFPPC_PORT_DOWN
             if rmsg.type == 2:
                 print "OFPT_ECHO_REQUEST"
+                msg = of.ofp_header(type=3, xid=rmsg.xid)
+                io_loop.update_handler(fd, io_loop.WRITE)
+                message_queue_map[sock].put(str(msg))
             if rmsg.type == 3:
                 print "OFPT_ECHO_REPLY"
             if rmsg.type == 4:
@@ -63,6 +75,19 @@ def client_handler(address, fd, events):
                 print "OFPT_SET_CONFIG"
             if rmsg.type == 10:
                 print "OFPT_PACKET_IN"
+                #rmsg.show()
+                pkt_in_msg = of.ofp_packet_in(body)
+                #pkt_in_msg.show()
+                pkt = pkt_in_msg.load
+                pkt_parsed = of.Ether(pkt)
+                #pkt_parsed.show()
+                #pkt_parsed.payload.show()
+                #print "to see if the payload of ether is IP"
+                #if isinstance(pkt_parsed.payload, of.IP):
+                    #pkt_parsed.show()
+                if isinstance(pkt_parsed.payload, of.ARP):
+                    pkt_parsed.show()
+                #io_loop.stop()
             if rmsg.type == 11: 
                 print "OFPT_FLOW_REMOVED"
             if rmsg.type == 12:

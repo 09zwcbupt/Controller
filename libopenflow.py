@@ -6,11 +6,16 @@ from scapy.all import *
 #uint16_t => ShortField, BitFieldLenField('name', None, 16, length_of='varfield')
 #uint32_t => IntField, BitFieldLenField('name', None, 32, length_of='varfield'),
 
+###################
+# Data Structures #
+###################
+
 class ofp_phy_port(Packet):
     name = "OpenFlow Port"
     fields_desc=[ ShortField("port_no", 0),
                   MACField("hw_addr", 0),
                   StrField("port_name", None, fmt="H", remain=24),
+
                   #TODO: still some problem with this part
                   #uint32_t for port config, for Openflow 1.0, this part only uses 7 bits.
                   BitField("OFPPC_PORT_DOWN", None, 1),
@@ -51,6 +56,10 @@ class ofp_phy_port(Packet):
                   BitField("peer", 0, 32)
                 ]
 
+###################
+# OpenFlow Header #
+###################
+
 class ofp_header(Packet):
     name = "OpenFlow Header "
     fields_desc=[ XByteField("version",1),
@@ -86,6 +95,11 @@ class ofp_header(Packet):
 
 #OFP_HELLO, OFP_ECHO_REQUEST and OFP_FEATURES_REQUEST do not have a body.
 
+#####################
+# OpenFlow Messages #
+#####################
+
+# No. 6
 class ofp_features_reply(Packet):
     name = "OpenFlow Switch Features Reply"
     """
@@ -98,9 +112,7 @@ class ofp_features_reply(Packet):
     fields_desc=[ BitFieldLenField('datapath_id', None, 64, length_of='varfield'),
                   BitFieldLenField('n_buffers', None, 32, length_of='varfield'),
                   XByteField("n_tables", 0),
-                  XByteField("pad", 0),
-                  XByteField("pad", 0),
-                  XByteField("pad", 0),
+                  X3BytesField("pad", 0),
                   #features
                   BitFieldLenField('capabilities', None, 32, length_of='varfield'),
                   BitFieldLenField('actions', None, 32, length_of='varfield'),
@@ -108,6 +120,20 @@ class ofp_features_reply(Packet):
                 ]
 
 bind_layers( ofp_header, ofp_features_reply, type=6 )
+
+# No. 10
+class ofp_packet_in(Packet):
+    name = "OpenFlow Packet In"
+    fields_desc=[ IntField("buffer_id", None),
+                  ShortField("total_len", None),
+                  ShortField("in_port", None),
+                  ByteEnumField("reason", 0,
+                      {
+                         0: "OFPR_NO_MATCH",
+                         1: "OFPR_ACTION",
+                      }),
+                  ByteField("pad", None)
+                ]
 
 if __name__ == '__main__':
     a = ofp_header()
@@ -122,6 +148,10 @@ if __name__ == '__main__':
 
     print "\n testing for the OFP_FEATURES_REPLY msg"
     b = ofp_header()/ofp_features_reply()
+    b.datapath_id = 00000001
+    b.capabilities = 123
+    b.actions = 1
+    b.n_buffers = 32
     b.show()
     c = str(b)
     print len(c)
@@ -133,3 +163,7 @@ if __name__ == '__main__':
     #if using part of received data, length can be devide by 8 is a must
     d = ofp_features_reply(c[0:39])
     d.show()
+    
+    #loading scapy packet
+    print "-----------------"
+    Ether().show()
