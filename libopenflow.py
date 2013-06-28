@@ -10,9 +10,19 @@ from scapy.all import *
 # Data Structures #
 ###################
 
+ofp_port = { 0xff00: "OFPP_MAX",
+             0xfff8: "OFPP_IN_PORT",
+             0xfff9: "OFPP_TABLE",
+             0xfffa: "OFPP_NORMAL",
+             0xfffb: "OFPP_FLOOD",
+             0xfffc: "OFPP_ALL",
+             0xfffd: "OFPP_CONTROLLER",
+             0xfffe: "OFPP_LOCAL",
+             0xffff: "OFPP_NONE"}
+
 class ofp_phy_port(Packet):
     name = "OpenFlow Port"
-    fields_desc=[ ShortField("port_no", 0),
+    fields_desc=[ ShortEnumField("port_no", 0, ofp_port),
                   MACField("hw_addr", 0),
                   StrField("port_name", None, fmt="H", remain=24),
 
@@ -51,47 +61,66 @@ class ofp_phy_port(Packet):
 
                   #uint32_t for features supported by the port
                   BitField("supported", 0, 32),
- 
+
                   #uint32_t for features advertised by peer
-                  BitField("peer", 0, 32)
-                ]
+                  BitField("peer", 0, 32)]
+
+ofp_action_type = { 0: "OFPAT_OUTPUT",
+                    1: "OFPAT_SET_VLAN_VID",
+                    2: "OFPAT_SET_VLAN_PCP",
+                    3: "OFPAT_STRIP_VLAN",
+                    4: "OFPAT_SET_DL_SRC",
+                    5: "OFPAT_SET_DL_DST",
+                    6: "OFPAT_SET_NW_SRC",
+                    7: "OFPAT_SET_NW_DST",
+                    8: "OFPAT_SET_NW_TOS",
+                    9: "OFPAT_SET_TP_SRC",
+                    10: "OFPAT_SET_TP_DST",
+                    11: "OFPAT_ENQUEUE",
+                    0xffff: "OFPAT_VENDOR"}
+
+class ofp_action_header(Packet):
+    name = "OpenFlow Action Header"
+    fields_desc=[ ShortEnumField("type", 0, ofp_action_type),
+                  ShortField("len", 0), #length of this action (including this header)
+                  XByteField("pad", 0)]
 
 ###################
 # OpenFlow Header #
 ###################
 
+ofp_type = { 0: "OFPT_HELLO",
+             1: "OFPT_ERROR",
+             2: "OFPT_ECHO_REQUEST",
+             3: "OFPT_ECHO_REPLY",
+             4: "OFPT_VENDOR",
+             5: "OFPT_FEATURES_REQUEST",
+             6: "OFPT_FEATURES_REPLY",
+             7: "OFPT_GET_CONFIG_REQUEST",
+             8: "OFPT_GET_CONFIG_REPLY",
+             9: "OFPT_SET_CONFIG",
+             10: "OFPT_PACKET_IN",
+             11: "OFPT_FLOW_REMOVED",
+             12: "OFPT_PORT_STATUS",
+             13: "OFPT_PACKET_OUT",
+             14: "OFPT_FLOW_MOD",
+             15: "OFPT_PORT_MOD",
+             16: "OFPT_STATS_REQUEST",
+             17: "OFPT_STATS_REPLY",
+             18: "OFPT_BARRIER_REQUEST",
+             19: "OFPT_BARRIER_REPLY",
+             20: "OFPT_QUEUE_GET_CONFIG_REQUEST",
+             21: "OFPT_QUEUE_GET_CONFIG_REPLY"
+             #Messages for circuit switched ports
+             #255: "OFPT_CFLOW_MOD",
+           }
+
 class ofp_header(Packet):
     name = "OpenFlow Header "
-    fields_desc=[ XByteField("version",1),
-                 ByteEnumField("type",0,
-                     {
-                         0: "OFPT_HELLO",
-                         1: "OFPT_ERROR",
-                         2: "OFPT_ECHO_REQUEST",
-                         3: "OFPT_ECHO_REPLY",
-                         4: "OFPT_VENDOR",
-                         5: "OFPT_FEATURES_REQUEST",
-                         6: "OFPT_FEATURES_REPLY",
-                         7: "OFPT_GET_CONFIG_REQUEST",
-                         8: "OFPT_GET_CONFIG_REPLY",
-                         9: "OFPT_SET_CONFIG",
-                         10: "OFPT_PACKET_IN",
-                         11: "OFPT_FLOW_REMOVED",
-                         12: "OFPT_PORT_STATUS",
-                         13: "OFPT_PACKET_OUT",
-                         14: "OFPT_FLOW_MOD",
-                         15: "OFPT_PORT_MOD",
-                         16: "OFPT_STATS_REQUEST",
-                         17: "OFPT_STATS_REPLY",
-                         18: "OFPT_BARRIER_REQUEST",
-                         19: "OFPT_BARRIER_REPLY",
-                         20: "OFPT_QUEUE_GET_CONFIG_REQUEST",
-                         21: "OFPT_QUEUE_GET_CONFIG_REPLY",
-                         #Messages for circuit switched ports
-                         #255: "OFPT_CFLOW_MOD",
-                     }),
-                 ShortField("length",8),
-                 IntField("xid" , 1) ]
+    fields_desc=[ XByteField("version", 1),
+                 ByteEnumField("type", 0, ofp_type),
+                 ShortField("length", 8),
+                 IntField("xid", 1) ]
 
 #OFP_HELLO, OFP_ECHO_REQUEST and OFP_FEATURES_REQUEST do not have a body.
 
@@ -121,19 +150,35 @@ class ofp_features_reply(Packet):
 
 bind_layers( ofp_header, ofp_features_reply, type=6 )
 
+ofp_packet_in_reason = { 0: "OFPR_NO_MATCH",
+                         1: "OFPR_ACTION",}
 # No. 10
 class ofp_packet_in(Packet):
     name = "OpenFlow Packet In"
     fields_desc=[ IntField("buffer_id", None),
                   ShortField("total_len", None),
                   ShortField("in_port", None),
-                  ByteEnumField("reason", 0,
-                      {
-                         0: "OFPR_NO_MATCH",
-                         1: "OFPR_ACTION",
-                      }),
-                  ByteField("pad", None)
-                ]
+                  ByteEnumField("reason", 0, ofp_packet_in_reason),
+                  ByteField("pad", None)]
+# No. 13
+class ofp_action_header(Packet):
+    name = "OpenFlow Packet Out"
+    fields_desc=[ IntField("buffer_id", None),
+                  ShortField("in_port", None),
+                  ShortField("actions_len", None)] #size of action array in bytes
+    #followed by actions
+
+bind_layers( ofp_header, ofp_action_header, type=13)
+
+class ofp_action_output(Packet):
+    name = "OpenFLow Action Output"
+    fields_desc=[ ShortEnumField("type", 0, ofp_action_type),
+                  ShortField("len", 8),
+                  ShortEnumField("port", None, ofp_port),
+                  ShortField("max_len", 0)]
+
+bind_layers( ofp_action_header, ofp_action_output, type=0)
+bind_layers( ofp_action_header, ofp_action_output, actions_len=8)
 
 if __name__ == '__main__':
     a = ofp_header()
@@ -148,6 +193,7 @@ if __name__ == '__main__':
 
     print "\n testing for the OFP_FEATURES_REPLY msg"
     b = ofp_header()/ofp_features_reply()
+    # before stringify the packet, must assign the labels that marked as 'None'
     b.datapath_id = 00000001
     b.capabilities = 123
     b.actions = 1

@@ -78,15 +78,33 @@ def client_handler(address, fd, events):
                 #rmsg.show()
                 pkt_in_msg = of.ofp_packet_in(body)
                 #pkt_in_msg.show()
-                pkt = pkt_in_msg.load
-                pkt_parsed = of.Ether(pkt)
+                raw = pkt_in_msg.load
+                pkt_parsed = of.Ether(raw)
                 #pkt_parsed.show()
                 #pkt_parsed.payload.show()
                 #print "to see if the payload of ether is IP"
                 #if isinstance(pkt_parsed.payload, of.IP):
                     #pkt_parsed.show()
                 if isinstance(pkt_parsed.payload, of.ARP):
-                    pkt_parsed.show()
+                    #pkt_parsed.show()
+                    pkt_out = of.ofp_header()/of.ofp_action_header()/of.ofp_action_output()
+                    pkt_out.payload.payload.port = 0xfffb
+                    pkt_out.payload.buffer_id = pkt_in_msg.buffer_id
+                    pkt_out.payload.in_port = pkt_in_msg.in_port
+                    pkt_out.length = 24
+                    pkt_out.show()
+                    io_loop.update_handler(fd, io_loop.WRITE)
+                    message_queue_map[sock].put(str(pkt_out))
+                if isinstance(pkt_parsed.payload, of.IP):
+                    if isinstance(pkt_parsed.payload.payload, of.ICMP):
+                        pkt_out = of.ofp_header()/of.ofp_action_header()/of.ofp_action_output()
+                        pkt_out.payload.payload.port = 0xfffb
+                        pkt_out.payload.buffer_id = pkt_in_msg.buffer_id
+                        pkt_out.payload.in_port = pkt_in_msg.in_port
+                        pkt_out.length = 24
+                        pkt_out.show()
+                        io_loop.update_handler(fd, io_loop.WRITE)
+                        message_queue_map[sock].put(str(pkt_out))
                 #io_loop.stop()
             if rmsg.type == 11: 
                 print "OFPT_FLOW_REMOVED"
