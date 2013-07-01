@@ -74,7 +74,7 @@ def client_handler(address, fd, events):
             if rmsg.type == 9:
                 print "OFPT_SET_CONFIG"
             if rmsg.type == 10:
-                print "OFPT_PACKET_IN"
+                #print "OFPT_PACKET_IN"
                 #rmsg.show()
                 pkt_in_msg = of.ofp_packet_in(body)
                 #pkt_in_msg.show()
@@ -92,7 +92,7 @@ def client_handler(address, fd, events):
                     pkt_out.payload.buffer_id = pkt_in_msg.buffer_id
                     pkt_out.payload.in_port = pkt_in_msg.in_port
                     pkt_out.length = 24
-                    pkt_out.show()
+                    #pkt_out.show()
                     io_loop.update_handler(fd, io_loop.WRITE)
                     message_queue_map[sock].put(str(pkt_out))
                 if isinstance(pkt_parsed.payload, of.IP):
@@ -102,7 +102,7 @@ def client_handler(address, fd, events):
                         pkt_out.payload.buffer_id = pkt_in_msg.buffer_id
                         pkt_out.payload.in_port = pkt_in_msg.in_port
                         pkt_out.length = 24
-                        pkt_out.show()
+                        #pkt_out.show()
                         io_loop.update_handler(fd, io_loop.WRITE)
                         message_queue_map[sock].put(str(pkt_out))
                 #io_loop.stop()
@@ -133,10 +133,10 @@ def client_handler(address, fd, events):
         try:
             next_msg = message_queue_map[sock].get_nowait()
         except Queue.Empty:
-            print "%s queue empty" % str(address)
+            #print "%s queue empty" % str(address)
             io_loop.update_handler(fd, io_loop.READ)
         else:
-            print 'sending "%s" to %s' % (of.ofp_header(next_msg).type, address)
+            #print 'sending "%s" to %s' % (of.ofp_header(next_msg).type, address)
             sock.send(next_msg)
 
 def agent(sock, fd, events):
