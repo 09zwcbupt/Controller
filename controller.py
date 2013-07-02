@@ -19,7 +19,19 @@ def client_handler(address, fd, events):
     #print sock, sock.getpeername(), sock.getsockname()
     if events & io_loop.READ:
         data = sock.recv(1024)
-        if data:
+        if data == '':
+            """
+            According to stackoverflow(http://stackoverflow.com/questions/667640/how-to-tell-if-a-connection-is-dead-in-python)
+            When a socket is closed, the server will receive a EOF. In python, however, server will
+            receive a empty string(''). So, when a switch disconnected, the server will find out
+            at once. But, if you do not react on this incident, there will be always a ``ioloop.read``
+            event. And the loop will run forever, thus, the CPU useage will be pretty high.
+            """
+            print "connection droped", sock, fd, sock.getpeername(), sock.getsockname()
+            io_loop.remove_handler(fd)
+        if len(data)<8:
+            print "not a openflow message"
+        else:
             #print len(data)
             #if the data length is 8, then only of header
             #else, there are payload after the header
@@ -152,6 +164,7 @@ def agent(sock, fd, events):
     fd_map[connection.fileno()] = connection
     client_handle = functools.partial(client_handler, address)
     io_loop.add_handler(connection.fileno(), client_handle, io_loop.READ)
+    print "in agent: new switch", connection.fileno(), client_handle
     message_queue_map[connection] = Queue.Queue()
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
