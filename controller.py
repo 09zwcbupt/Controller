@@ -1,7 +1,6 @@
 import errno
 import functools
 import tornado.ioloop as ioloop
-import tornado.iostream as iostream
 import socket
 import libopenflow as of
 
@@ -9,10 +8,48 @@ import Queue
 
 fd_map = {}
 message_queue_map = {}
+#this is only for remember socket's fd with controller.
+controller = 0
+#this is temp var, for storing feature request msg from sw
+feat = 0
 
 def handle_connection(connection, address):
         print "1 connection,", connection, address
 
+def control(address, fd, events):
+    sock = fd_map[fd]
+    if events & io_loop.READ:
+        print "msg from controller"
+        data = sock.recv(1024)
+        if data == '':
+            print "controller disconnected"
+            io_loop.remove_handler(fd)
+        if data:
+            rmsg = of.ofp_header(data)
+            print "msg from controller", rmsg
+            rmsg.show()
+            if rmsg.type == 0:
+                print "OFPT_HELLO From Controller"
+                msg = of.ofp_header(type = 5)
+                io_loop.update_handler(fd, io_loop.WRITE)
+                message_queue_map[sock].put(data)
+                message_queue_map[sock].put(str(msg))
+            if rmsg.type == 5:
+                print "OFPT_FEATURES_REQUEST From Controller"
+                feat.show()
+                io_loop.update_handler(fd, io_loop.WRITE)
+                message_queue_map[sock].put(str(feat))
+
+    if events & io_loop.WRITE:
+        print "trying to send packet to controller" 
+        try:
+            next_msg = message_queue_map[sock].get_nowait()
+        except Queue.Empty:
+            #print "%s queue empty" % str(address)
+            io_loop.update_handler(fd, io_loop.READ)
+        else:
+            #print 'sending "%s" to %s' % (of.ofp_header(next_msg).type, address)
+            sock.send(next_msg)
 
 def client_handler(address, fd, events):
     sock = fd_map[fd]
@@ -27,7 +64,7 @@ def client_handler(address, fd, events):
             at once. But, if you do not react on this incident, there will be always a ``ioloop.read``
             event. And the loop will run forever, thus, the CPU useage will be pretty high.
             """
-            print "connection droped", sock, fd, sock.getpeername(), sock.getsockname()
+            print "connection dropped", sock, fd, sock.getpeername(), sock.getsockname()
             io_loop.remove_handler(fd)
         if len(data)<8:
             print "not a openflow message"
@@ -54,20 +91,39 @@ def client_handler(address, fd, events):
             if rmsg.type == 6:
                 print "OFPT_FEATURES_REPLY"
                 #print "rmsg.load:",len(body)/48
-                msg = of.ofp_features_reply(body[0:24])#lenth of reply msg
+                msg = of.ofp_features_reply(body[0:24])#length of reply msg
                 #msg.show()
                 port_info_raw = body[24:]
                 port_info = {}
                 for i in range(len(port_info_raw)/48):
                     #print "port", i, ":"
                     """The port structure has a length of 48 bytes.
-                       so when reciving port info, firse split the list
+                       so when receiving port info, first split the list
                        into port structure length and then analysis
                     """
                     port_info[i] = of.ofp_phy_port(port_info_raw[0+i*48:47+i*48])
                     #print port_info[i].port_name
                     #port_info[i].show()
                     #print port_info[i].OFPPC_PORT_DOWN
+
+                #create a new socket for this switch, connecting to a real controller
+                sock_control = new_sock(1)
+                print "before error?"
+                sock_control.connect(("10.2.28.36",6633))#10.2.28.36
+                print "after error?"
+                fd_map[sock_control.fileno()] = sock_control
+                switch_handler = functools.partial(control, address)
+                io_loop.add_handler(sock_control.fileno(), switch_handler, io_loop.READ)
+                print "in agent: connecting to controller"
+                message_queue_map[sock_control] = Queue.Queue()
+                msg = of.ofp_header(type=0) #generate a hello message
+                msg.show()
+                #sock_control.send(str(msg))
+                controller = sock_control.fileno()
+                io_loop.update_handler(controller, io_loop.WRITE)
+                message_queue_map[controller].put(str(msg))
+                feat = data
+                print "say hello to the controller"
             if rmsg.type == 2:
                 print "OFPT_ECHO_REQUEST"
                 msg = of.ofp_header(type=3, xid=rmsg.xid)
@@ -167,9 +223,14 @@ def agent(sock, fd, events):
     print "in agent: new switch", connection.fileno(), client_handle
     message_queue_map[connection] = Queue.Queue()
 
-sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
-sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-sock.setblocking(0)
+def new_sock(block):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sock.setblocking(block)
+    return sock
+
+
+sock = new_sock(0)
 sock.bind(("", 6633))
 sock.listen(6633)
 

@@ -63,6 +63,8 @@ def client_handler(address, fd, events):
             sock.send(next_msg)
 
 def agent(sock, fd, events):
+    #TODO: create a new class for switches. when a switch connected to agent, new class
+    #also, the sw is connected to controller using another socket.
     #print fd, sock, events
     try:
         connection, address = sock.accept()
@@ -81,7 +83,13 @@ def agent(sock, fd, events):
     
     
     sock_control = new_sock(1)#no idea why, but when not blocking, it says: error: [Errno 36] Operation now in progress
-    sock_control.connect(("10.2.28.36",6633))#controller's IP
+    try:#look at: http://bbs.csdn.net/topics/230007709
+        #it says such way can avoid error?
+        sock_control.connect(("10.2.30.198",6633))#controller's IP
+    except socket.error, e:
+        if e.args[0] not in (errno.EWOULDBLOCK, errno.EAGAIN, errno.EINPROGRESS):
+            raise
+        return
     fd_map[sock_control.fileno()] = sock_control
     switch_handler = functools.partial(control, address)
     io_loop.add_handler(sock_control.fileno(), switch_handler, io_loop.READ)
