@@ -6,10 +6,6 @@ import libopenflow as of
 
 import Queue
 
-fd_map = {}
-message_queue_map = {}
-fd_dict = {} #[control : sw; sw : control]
-
 #create a connection between socket fd of (controller, sw) and sw class 
 fdmap = {}
 num = 0
@@ -52,7 +48,6 @@ class switch():
                 io_loop.remove_handler(self.fd_sw)
             else:
                 rmsg = of.ofp_header(data)
-                #print "msg from controller", rmsg
                 #rmsg.show()
                 io_loop.update_handler(self.fd_sw, io_loop.WRITE)
                 self.queue_sw.put(str(data))
@@ -69,17 +64,15 @@ class switch():
                 self.sock_con.send(next_msg)
 
     def client_handler(self, address, fd, events):
-        #print sock, sock.getpeername(), sock.getsockname()
         if events & io_loop.READ:
             data = self.sock_sw.recv(1024)
             if data == '':
-                print "switch disconnected"#, sock, self.fd_sw, sock.getpeername(), sock.getsockname()
+                print "switch disconnected"
                 io_loop.remove_handler(self.fd_sw)
                 print "closing connection to controller"
                 self.sock_con.close()
                 io_loop.remove_handler(self.fd_con)
             else:
-                #print "received something"
                 io_loop.update_handler(self.fd_con, io_loop.WRITE)
                 self.queue_con.put(str(data))
     
@@ -130,20 +123,13 @@ def agent(sock, fd, events):
     
     #print_connection(connection, address)
     #print_connection(sock_control, sock_control.getpeername())
-    #fd_map[connection.fileno()] = connection
-    #switch = connection.fileno()
     client_handle = functools.partial(new_switch.client_handler, address)
     io_loop.add_handler(connection.fileno(), client_handle, io_loop.READ)
-    print "agent: connected to switch", num#, connection.fileno(), client_handle
-    #message_queue_map[connection] = Queue.Queue()
+    print "agent: connected to switch", num
     
-    #fd_map[sock_control.fileno()] = sock_control
     switch_handler = functools.partial(new_switch.control, address)
     io_loop.add_handler(sock_control.fileno(), switch_handler, io_loop.READ)
     print "agent: connected to controller"
-    #message_queue_map[sock_control] = Queue.Queue()
-    #fd_dict[connection.fileno()] = sock_control.fileno()
-    #d_dict[sock_control.fileno()] = connection.fileno()
 
 if __name__ == '__main__':
     sock = new_sock(0)
@@ -151,7 +137,6 @@ if __name__ == '__main__':
     sock.listen(6633)
     num = 0
     io_loop = ioloop.IOLoop.instance()
-    #callback = functools.partial(connection_ready, sock)
     callback = functools.partial(agent, sock)
     print sock, sock.getsockname()
     io_loop.add_handler(sock.fileno(), callback, io_loop.READ)
