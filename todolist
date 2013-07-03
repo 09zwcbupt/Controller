@@ -1,7 +1,12 @@
 To do list:
 1 OF协议封装
-	1.1 Header中的Type信息如何与Payload中的message type自动对应？
+	1.1 Header中的Type信息如何与Payload中的message type自动对应？[完成]
 	1.2 Header中的length信息如何自动对应（定长、变长）
 2 单线程Agent
-	1.1 OpenFlow交换机与控制器的会话逻辑
+	2.1 OpenFlow交换机与控制器的会话逻辑 [完成]
+	2.2 完成不解析OF的透明代理 [完成]
+	2.3 信息维护表（连接控制器的socket与连接交换机socket的对应）
 3 并行架构
+	3.1 考虑基于gevent做多线程架构
+4 文档
+	4.1 用Sphinx
