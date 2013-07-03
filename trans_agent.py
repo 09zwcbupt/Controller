@@ -1,3 +1,7 @@
+"""
+In this agent, the Tornado TCP server will use one process to manage all the classes.
+Therefore, the total throughput of this script will be affected.  
+"""
 import errno
 import functools
 import tornado.ioloop as ioloop
@@ -28,6 +32,11 @@ def new_sock(block):
     sock.setblocking(block)
     return sock
 
+"""
+The switch class maintains the connection between controller and individual 
+switches. For each OpenFlow switch, this transparent agent create a object of this 
+class. 
+"""
 class switch():
     def __init__(self, sock_sw, sock_con):
         self.sock_sw    = sock_sw
@@ -37,7 +46,7 @@ class switch():
         self.queue_con  = Queue.Queue()
         self.queue_sw   = Queue.Queue()
         
-    def control(self, address, fd, events):
+    def controller_handler(self, address, fd, events):
         if events & io_loop.READ:
             data = self.sock_con.recv(1024)
             if data == '':
@@ -48,6 +57,7 @@ class switch():
                 io_loop.remove_handler(self.fd_sw)
             else:
                 rmsg = of.ofp_header(data)
+                # Here, we can manipulate OpenFlow packets from CONTROLLER.
                 #rmsg.show()
                 io_loop.update_handler(self.fd_sw, io_loop.WRITE)
                 self.queue_sw.put(str(data))
@@ -63,7 +73,7 @@ class switch():
                 print 'sending "%s" to %s' % (of.ofp_type[of.ofp_header(next_msg).type], self.sock_con.getpeername())
                 self.sock_con.send(next_msg)
 
-    def client_handler(self, address, fd, events):
+    def switch_handler(self, address, fd, events):
         if events & io_loop.READ:
             data = self.sock_sw.recv(1024)
             if data == '':
@@ -73,6 +83,8 @@ class switch():
                 self.sock_con.close()
                 io_loop.remove_handler(self.fd_con)
             else:
+                rmsg = of.ofp_header(data)
+                # Here, we can manipulate OpenFlow packets from SWITCH.
                 io_loop.update_handler(self.fd_con, io_loop.WRITE)
                 self.queue_con.put(str(data))
     
@@ -86,6 +98,17 @@ class switch():
                 print 'sending "%s" to %s' % (of.ofp_type[of.ofp_header(next_msg).type], self.sock_sw.getpeername())
                 self.sock_sw.send(next_msg)
 
+"""
+For the callback function of socket listening, the agent function will first
+try to accept the connection started by switch. And if the connection is successful,
+this function will continue on creating another socket to connect the controller.
+If the controller cannot be reached, there will be ``ECONNREFUSED`` error. 
+
+After all these things are done, we will have two sockets, one from OpenFlow switch, another 
+one to controller. Send these two sockets as parameter, a new switch object can be 
+created. Before exit the agent function, this function will add ``new_switch.switch_handler``
+and ``new_switch.controller_handler`` to callback function of their own socket.
+"""
 def agent(sock, fd, events):
     #TODO: create a new class for switches. when a switch connected to agent, new class
     #also, the sw is connected to controller using another socket.
@@ -104,7 +127,7 @@ def agent(sock, fd, events):
     #no idea why, but when not blocking, it says: error: [Errno 36] Operation now in progress
     sock_control = new_sock(1)
     try:
-        sock_control.connect(("10.2.30.198",6633))#controller's IP
+        sock_control.connect(("10.2.30.198",6633))#controller's IP, better change it into an argument
     except socket.error, e:
         if e.args[0] not in (errno.ECONNREFUSED, errno.EINPROGRESS):
             raise
@@ -123,15 +146,23 @@ def agent(sock, fd, events):
     
     #print_connection(connection, address)
     #print_connection(sock_control, sock_control.getpeername())
-    client_handle = functools.partial(new_switch.client_handler, address)
-    io_loop.add_handler(connection.fileno(), client_handle, io_loop.READ)
-    print "agent: connected to switch", num
-    
-    switch_handler = functools.partial(new_switch.control, address)
-    io_loop.add_handler(sock_control.fileno(), switch_handler, io_loop.READ)
+    controller_handler = functools.partial(new_switch.controller_handler, address)
+    io_loop.add_handler(sock_control.fileno(), controller_handler, io_loop.READ)
     print "agent: connected to controller"
+    
+    switch_handler = functools.partial(new_switch.switch_handler, address)
+    io_loop.add_handler(connection.fileno(), switch_handler, io_loop.READ)
+    print "agent: connected to switch", num
 
 if __name__ == '__main__':
+    """
+    For Tornado, there usually is only one thread, listening to the socket
+    below. And also, this code block uses ``ioloop.add_handler()`` function
+    to register a callback function if ``ioloop.READ`` event happens.
+    
+    When a new request from of switch, it will trigger ``ioloop.READ`` event
+    in Tornado. And Tornado will execute the callback function ``agent()``.
+    """
     sock = new_sock(0)
     sock.bind(("", 6633))
     sock.listen(6633)
