@@ -16,41 +16,6 @@ feat = 0
 def handle_connection(connection, address):
         print "1 connection,", connection, address
 
-def control(address, fd, events):
-    sock = fd_map[fd]
-    if events & io_loop.READ:
-        print "msg from controller"
-        data = sock.recv(1024)
-        if data == '':
-            print "controller disconnected"
-            io_loop.remove_handler(fd)
-        if data:
-            rmsg = of.ofp_header(data)
-            print "msg from controller", rmsg
-            rmsg.show()
-            if rmsg.type == 0:
-                print "OFPT_HELLO From Controller"
-                msg = of.ofp_header(type = 5)
-                io_loop.update_handler(fd, io_loop.WRITE)
-                message_queue_map[sock].put(data)
-                message_queue_map[sock].put(str(msg))
-            if rmsg.type == 5:
-                print "OFPT_FEATURES_REQUEST From Controller"
-                feat.show()
-                io_loop.update_handler(fd, io_loop.WRITE)
-                message_queue_map[sock].put(str(feat))
-
-    if events & io_loop.WRITE:
-        print "trying to send packet to controller" 
-        try:
-            next_msg = message_queue_map[sock].get_nowait()
-        except Queue.Empty:
-            #print "%s queue empty" % str(address)
-            io_loop.update_handler(fd, io_loop.READ)
-        else:
-            #print 'sending "%s" to %s' % (of.ofp_header(next_msg).type, address)
-            sock.send(next_msg)
-
 def client_handler(address, fd, events):
     sock = fd_map[fd]
     #print sock, sock.getpeername(), sock.getsockname()
@@ -64,7 +29,7 @@ def client_handler(address, fd, events):
             at once. But, if you do not react on this incident, there will be always a ``ioloop.read``
             event. And the loop will run forever, thus, the CPU useage will be pretty high.
             """
-            print "connection dropped", sock, fd, sock.getpeername(), sock.getsockname()
+            print "connection dropped"
             io_loop.remove_handler(fd)
         if len(data)<8:
             print "not a openflow message"
@@ -107,24 +72,6 @@ def client_handler(address, fd, events):
                     port_info[i].show()
                     #print port_info[i].OFPPC_PORT_DOWN
 
-                #create a new socket for this switch, connecting to a real controller
-                sock_control = new_sock(1)
-                print "before error?"
-                sock_control.connect(("10.2.28.36",6633))#10.2.28.36
-                print "after error?"
-                fd_map[sock_control.fileno()] = sock_control
-                switch_handler = functools.partial(control, address)
-                io_loop.add_handler(sock_control.fileno(), switch_handler, io_loop.READ)
-                print "in agent: connecting to controller"
-                message_queue_map[sock_control] = Queue.Queue()
-                msg = of.ofp_header(type=0) #generate a hello message
-                msg.show()
-                #sock_control.send(str(msg))
-                controller = sock_control.fileno()
-                io_loop.update_handler(controller, io_loop.WRITE)
-                message_queue_map[controller].put(str(msg))
-                feat = data
-                print "say hello to the controller"
             if rmsg.type == 2:
                 print "OFPT_ECHO_REQUEST"
                 msg = of.ofp_header(type=3, xid=rmsg.xid)
@@ -143,7 +90,7 @@ def client_handler(address, fd, events):
             if rmsg.type == 9:
                 print "OFPT_SET_CONFIG"
             if rmsg.type == 10:
-                #print "OFPT_PACKET_IN"
+                print "OFPT_PACKET_IN"
                 #rmsg.show()
                 pkt_in_msg = of.ofp_packet_in(body)
                 #pkt_in_msg.show()
@@ -156,7 +103,7 @@ def client_handler(address, fd, events):
                     #pkt_parsed.show()
                 if isinstance(pkt_parsed.payload, of.ARP):
                     #pkt_parsed.show()
-                    pkt_out = of.ofp_header()/of.ofp_action_header()/of.ofp_action_output()
+                    pkt_out = of.ofp_header()/of.ofp_pktout_header()/of.ofp_action_output()
                     pkt_out.payload.payload.port = 0xfffb
                     pkt_out.payload.buffer_id = pkt_in_msg.buffer_id
                     pkt_out.payload.in_port = pkt_in_msg.in_port
@@ -166,7 +113,7 @@ def client_handler(address, fd, events):
                     message_queue_map[sock].put(str(pkt_out))
                 if isinstance(pkt_parsed.payload, of.IP):
                     if isinstance(pkt_parsed.payload.payload, of.ICMP):
-                        pkt_out = of.ofp_header()/of.ofp_action_header()/of.ofp_action_output()
+                        pkt_out = of.ofp_header()/of.ofp_pktout_header()/of.ofp_action_output()
                         pkt_out.payload.payload.port = 0xfffb
                         pkt_out.payload.buffer_id = pkt_in_msg.buffer_id
                         pkt_out.payload.in_port = pkt_in_msg.in_port

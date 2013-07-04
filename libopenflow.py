@@ -105,7 +105,7 @@ ofp_type = { 0: "OFPT_HELLO",
              10: "OFPT_PACKET_IN",
              11: "OFPT_FLOW_REMOVED",
              12: "OFPT_PORT_STATUS",
-             13: "OFPT_PACKET_OUT",
+             13: "OFPT_PACKET_OUT",# with action header
              14: "OFPT_FLOW_MOD",
              15: "OFPT_PORT_MOD",
              16: "OFPT_STATS_REQUEST",
@@ -163,15 +163,15 @@ class ofp_packet_in(Packet):
                   ShortField("in_port", None),
                   ByteEnumField("reason", 0, ofp_packet_in_reason),
                   ByteField("pad", None)]
-# No. 13
-class ofp_action_header(Packet):
+
+# No. 13 
+class ofp_pktout_header(Packet):
     name = "OpenFlow Packet Out"
     fields_desc=[ IntField("buffer_id", None),
                   ShortField("in_port", None),
-                  ShortField("actions_len", None)] #size of action array in bytes
-    #followed by actions
+                  ShortField("actions_len", None)] 
 
-bind_layers( ofp_header, ofp_action_header, type=13)
+bind_layers( ofp_header, ofp_pktout_header, type=13)
 
 class ofp_action_output(Packet):
     name = "OpenFLow Action Output"
@@ -180,8 +180,8 @@ class ofp_action_output(Packet):
                   ShortEnumField("port", None, ofp_port),
                   ShortField("max_len", 0)]
 
-bind_layers( ofp_action_header, ofp_action_output, type=0)
-bind_layers( ofp_action_header, ofp_action_output, actions_len=8)
+bind_layers( ofp_pktout_header, ofp_action_output, type=0)
+bind_layers( ofp_pktout_header, ofp_action_output, actions_len=8)
 
 if __name__ == '__main__':
     a = ofp_header()
