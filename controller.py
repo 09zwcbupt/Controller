@@ -92,18 +92,19 @@ def client_handler(address, fd, events):
                 print "OFPT_FEATURES_REPLY"
                 #print "rmsg.load:",len(body)/48
                 msg = of.ofp_features_reply(body[0:24])#length of reply msg
-                #msg.show()
+                msg.show()
                 port_info_raw = body[24:]
                 port_info = {}
+                print "port number:",len(port_info_raw)/48, "total length:", len(port_info_raw)
                 for i in range(len(port_info_raw)/48):
-                    #print "port", i, ":"
+                    print "port", i, ",len:", len(port_info_raw[0+i*48:48+i*48]) 
                     """The port structure has a length of 48 bytes.
                        so when receiving port info, first split the list
                        into port structure length and then analysis
                     """
-                    port_info[i] = of.ofp_phy_port(port_info_raw[0+i*48:47+i*48])
+                    port_info[i] = of.ofp_phy_port(port_info_raw[0+i*48:48+i*48])
                     #print port_info[i].port_name
-                    #port_info[i].show()
+                    port_info[i].show()
                     #print port_info[i].OFPPC_PORT_DOWN
 
                 #create a new socket for this switch, connecting to a real controller
