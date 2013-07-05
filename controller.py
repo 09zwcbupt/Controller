@@ -8,10 +8,6 @@ import Queue
 
 fd_map = {}
 message_queue_map = {}
-#this is only for remember socket's fd with controller.
-controller = 0
-#this is temp var, for storing feature request msg from sw
-feat = 0
 
 def handle_connection(connection, address):
         print "1 connection,", connection, address
@@ -93,7 +89,7 @@ def client_handler(address, fd, events):
                 print "OFPT_PACKET_IN"
                 #rmsg.show()
                 pkt_in_msg = of.ofp_packet_in(body)
-                pkt_in_msg.show()
+                #pkt_in_msg.show()
                 raw = pkt_in_msg.load
                 pkt_parsed = of.Ether(raw)
                 #pkt_parsed.payload.show()
@@ -112,15 +108,25 @@ def client_handler(address, fd, events):
                     message_queue_map[sock].put(str(pkt_out))
                 if isinstance(pkt_parsed.payload, of.IP):
                     if isinstance(pkt_parsed.payload.payload, of.ICMP):
+                        print "from", pkt_parsed.src, "to", pkt_parsed.dst 
+                        
+                        """
+                        When receive a OPF_PACKET_IN message, you can caculate a path, and then
+                        use OFP_FLOW_MOD message to install path. Also, you can find out the exact
+                        port to send the message, then you can use the following code to send a
+                        OFP_PACKET_OUT message and send the packet to destination.
+                         
                         pkt_parsed.show()
                         pkt_out = of.ofp_header()/of.ofp_pktout_header()/of.ofp_action_output()
                         pkt_out.payload.payload.port = 0xfffb
                         pkt_out.payload.buffer_id = pkt_in_msg.buffer_id
                         pkt_out.payload.in_port = pkt_in_msg.in_port
                         pkt_out.length = 24
+
+                        io_loop.update_handler(fd, io_loop.WRITE)
+                        message_queue_map[sock].put(str(pkt_out))
+                        """
                         #pkt_out.show()
-                        #io_loop.update_handler(fd, io_loop.WRITE)
-                        #message_queue_map[sock].put(str(pkt_out))
                         #usually don't have to fill in ``wilecards`` area 
                         flow_mod_msg = of.ofp_header(type=14,
                                                      length=80)/\
@@ -128,21 +134,18 @@ def client_handler(address, fd, events):
                         /of.ofp_match(in_port=pkt_in_msg.in_port,
                                       dl_src=pkt_parsed.src,
                                       dl_dst=pkt_parsed.dst,
-                                      #dl_vlan=pkt_parsed.,
-                                      #dl_vlan_pcp=pkt_parsed,
                                       dl_type=pkt_parsed.type,
                                       nw_tos=pkt_parsed.payload.tos,
                                       nw_proto=pkt_parsed.payload.proto,
                                       nw_src=pkt_parsed.payload.src,
                                       nw_dst=pkt_parsed.payload.dst)\
                         /of.ofp_flow_mod(command=0,
-                                         idle_timeout=60,
                                          buffer_id=pkt_in_msg.buffer_id)\
                         /of.ofp_action_output(type=0,
                                               port=0xfffb,
                                               len=8)
-                        flow_mod_msg.show()
-                        """"""
+                        """flow_mod_msg.show()
+                        
                         print "--------------------------------------------------------------------------------------"
                         print "len of flow_mod_msg        :", len(str(flow_mod_msg))
                         print "len of of_header()         :", len(str(of.ofp_header()))
@@ -151,6 +154,7 @@ def client_handler(address, fd, events):
                         print "len of ofp_flow_mod()      :", len(str(of.ofp_flow_mod(command=0,idle_timeout=60,buffer_id=pkt_in_msg.buffer_id)))
                         print "len of ofp_action_output() :", len(str(of.ofp_action_output(type=0,port=0xfffb,len=8)))
                         print "--------------------------------------------------------------------------------------"
+                        """
                         io_loop.update_handler(fd, io_loop.WRITE)
                         message_queue_map[sock].put(str(flow_mod_msg))
                 #io_loop.stop()
@@ -210,13 +214,14 @@ def new_sock(block):
     return sock
 
 
-sock = new_sock(0)
-sock.bind(("", 6633))
-sock.listen(6633)
-
-io_loop = ioloop.IOLoop.instance()
-#callback = functools.partial(connection_ready, sock)
-callback = functools.partial(agent, sock)
-print sock, sock.getsockname()
-io_loop.add_handler(sock.fileno(), callback, io_loop.READ)
-io_loop.start()
+if __name__ == '__main__':
+    sock = new_sock(0)
+    sock.bind(("", 6633))
+    sock.listen(6633)
+    
+    io_loop = ioloop.IOLoop.instance()
+    #callback = functools.partial(connection_ready, sock)
+    callback = functools.partial(agent, sock)
+    print sock, sock.getsockname()
+    io_loop.add_handler(sock.fileno(), callback, io_loop.READ)
+    io_loop.start()

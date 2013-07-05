@@ -6,9 +6,35 @@ from scapy.all import *
 #uint16_t => ShortField, BitFieldLenField('name', None, 16, length_of='varfield')
 #uint32_t => IntField, BitFieldLenField('name', None, 32, length_of='varfield'),
 
+
+
+
 ###################
 # Data Structures #
 ###################
+
+ofp_type = { 0: "OFPT_HELLO",
+             1: "OFPT_ERROR",
+             2: "OFPT_ECHO_REQUEST",
+             3: "OFPT_ECHO_REPLY",
+             4: "OFPT_VENDOR",
+             5: "OFPT_FEATURES_REQUEST",
+             6: "OFPT_FEATURES_REPLY",
+             7: "OFPT_GET_CONFIG_REQUEST",
+             8: "OFPT_GET_CONFIG_REPLY",
+             9: "OFPT_SET_CONFIG",
+             10: "OFPT_PACKET_IN",
+             11: "OFPT_FLOW_REMOVED",
+             12: "OFPT_PORT_STATUS",
+             13: "OFPT_PACKET_OUT",# with action header
+             14: "OFPT_FLOW_MOD",
+             15: "OFPT_PORT_MOD",
+             16: "OFPT_STATS_REQUEST",
+             17: "OFPT_STATS_REPLY",
+             18: "OFPT_BARRIER_REQUEST",
+             19: "OFPT_BARRIER_REPLY",
+             20: "OFPT_QUEUE_GET_CONFIG_REQUEST",
+             21: "OFPT_QUEUE_GET_CONFIG_REPLY"}
 
 ofp_port = { 0xff00: "OFPP_MAX",
              0xfff8: "OFPP_IN_PORT",
@@ -33,6 +59,15 @@ ofp_action_type = { 0: "OFPAT_OUTPUT",
                     10: "OFPAT_SET_TP_DST",
                     11: "OFPAT_ENQUEUE",
                     0xffff: "OFPAT_VENDOR"}
+
+ofp_packet_in_reason = { 0: "OFPR_NO_MATCH",
+                         1: "OFPR_ACTION",}
+
+ofp_flow_mod_command = { 0: "OFPFC_ADD", #New flow
+                         1: "OFPFC_MODIFY", #Modify all matching flows
+                         2: "OFPFC_MODIFY_STRICT", #Modify entry strictly matching wildcards
+                         3: "OFPFC_DELETE", #Delete all matching flows
+                         4: "OFPFC_DELETE_STRICT" } #Strictly match wildcards and priority
 
 class ofp_phy_port(Packet):
     name = "OpenFlow Port"
@@ -111,7 +146,7 @@ class ofp_match(Packet):
                   ShortEnumField("in_port", 0, ofp_port),   #Input switch port
                   MACField("dl_src", "00:00:00:00:00:00"),        #Ethernet source address
                   MACField("dl_dst", "00:00:00:00:00:00"),        #Ethernet destination address
-                  ShortField("dl_vlan", 0),     #input VLAN id
+                  ShortField("dl_vlan", 0xffff),     #input VLAN id
                   XByteField("dl_vlan_pcp", 0), #input VLAN priority
                   XByteField("pad1", 0),        #Padding to align to 64 bits
                   ShortField("dl_type", 0),     #Ethernet frame type
@@ -125,35 +160,12 @@ class ofp_match(Packet):
                   ShortField("tp_dst", 0),      #TCP/UDP destination port
                 ]
 
+
+
+
 ###################
 # OpenFlow Header #
 ###################
-
-ofp_type = { 0: "OFPT_HELLO",
-             1: "OFPT_ERROR",
-             2: "OFPT_ECHO_REQUEST",
-             3: "OFPT_ECHO_REPLY",
-             4: "OFPT_VENDOR",
-             5: "OFPT_FEATURES_REQUEST",
-             6: "OFPT_FEATURES_REPLY",
-             7: "OFPT_GET_CONFIG_REQUEST",
-             8: "OFPT_GET_CONFIG_REPLY",
-             9: "OFPT_SET_CONFIG",
-             10: "OFPT_PACKET_IN",
-             11: "OFPT_FLOW_REMOVED",
-             12: "OFPT_PORT_STATUS",
-             13: "OFPT_PACKET_OUT",# with action header
-             14: "OFPT_FLOW_MOD",
-             15: "OFPT_PORT_MOD",
-             16: "OFPT_STATS_REQUEST",
-             17: "OFPT_STATS_REPLY",
-             18: "OFPT_BARRIER_REQUEST",
-             19: "OFPT_BARRIER_REPLY",
-             20: "OFPT_QUEUE_GET_CONFIG_REQUEST",
-             21: "OFPT_QUEUE_GET_CONFIG_REPLY"
-             #Messages for circuit switched ports
-             #255: "OFPT_CFLOW_MOD",
-           }
 
 class ofp_header(Packet):
     name = "OpenFlow Header "
@@ -169,6 +181,10 @@ class ofp_action_header(Packet):
     fields_desc=[ ShortEnumField("type", 0, ofp_action_type),
                   ShortField("len", 0), #length of this action (including this header)
                   XByteField("pad", 0)]
+
+
+
+
 
 #####################
 # OpenFlow Messages #
@@ -193,11 +209,8 @@ class ofp_features_reply(Packet):
                   BitFieldLenField('actions', None, 32, length_of='varfield'),
                   #port info can be resoved at TCP server
                 ]
-
 bind_layers( ofp_header, ofp_features_reply, type=6 )
 
-ofp_packet_in_reason = { 0: "OFPR_NO_MATCH",
-                         1: "OFPR_ACTION",}
 # No. 10
 class ofp_packet_in(Packet):
     name = "OpenFlow Packet In"
@@ -213,7 +226,6 @@ class ofp_pktout_header(Packet):
     fields_desc=[ IntField("buffer_id", None),
                   ShortField("in_port", None),
                   ShortField("actions_len", None)] 
-
 bind_layers( ofp_header, ofp_pktout_header, type=13)
 
 class ofp_action_output(Packet):
@@ -222,23 +234,17 @@ class ofp_action_output(Packet):
                   ShortField("len", 8),
                   ShortEnumField("port", None, ofp_port),
                   ShortField("max_len", 0)]
-
 bind_layers( ofp_pktout_header, ofp_action_output, type=0)
 bind_layers( ofp_pktout_header, ofp_action_output, actions_len=8)
 
 # No. 14
-ofp_flow_mod_command = { 0: "OFPFC_ADD", #New flow
-                         1: "OFPFC_MODIFY", #Modify all matching flows
-                         2: "OFPFC_MODIFY_STRICT", #Modify entry strictly matching wildcards
-                         3: "OFPFC_DELETE", #Delete all matching flows
-                         4: "OFPFC_DELETE_STRICT" } #Strictly match wildcards and priority
 
 class ofp_flow_mod(Packet):
     name = "OpenFlow Flow Modify"
     fields_desc=[ BitField("not_defined", 0, 64), #Opaque controller-issued identifier
                   #Flow Actions
                   ShortEnumField("command", 0, ofp_flow_mod_command),
-                  ShortField("idle_timeout", 0),
+                  ShortField("idle_timeout", 60),
                   ShortField("hard_timeout", 0),
                   ShortField("priority", 0),
                   IntField("buffer_id", 0),
@@ -248,6 +254,8 @@ class ofp_flow_mod(Packet):
                   #1<<2 bit is OFPFF_EMERG, used only switch disconnected with controller) 
                   ShortField("flags", 0)
                 ]
+
+
 
 if __name__ == '__main__':
     a = ofp_header()
