@@ -57,19 +57,19 @@ def client_handler(address, fd, events):
                 print "OFPT_FEATURES_REPLY"
                 #print "rmsg.load:",len(body)/48
                 msg = of.ofp_features_reply(body[0:24])#length of reply msg
-                msg.show()
+                #msg.show()
                 port_info_raw = body[24:]
                 port_info = {}
                 print "port number:",len(port_info_raw)/48, "total length:", len(port_info_raw)
                 for i in range(len(port_info_raw)/48):
-                    print "port", i, ",len:", len(port_info_raw[0+i*48:48+i*48]) 
+                    #print "port", i, ",len:", len(port_info_raw[0+i*48:48+i*48]) 
                     """The port structure has a length of 48 bytes.
                        so when receiving port info, first split the list
                        into port structure length and then analysis
                     """
                     port_info[i] = of.ofp_phy_port(port_info_raw[0+i*48:48+i*48])
                     #print port_info[i].port_name
-                    port_info[i].show()
+                    #port_info[i].show()
                     #print port_info[i].OFPPC_PORT_DOWN
 
             if rmsg.type == 2:
@@ -93,10 +93,9 @@ def client_handler(address, fd, events):
                 print "OFPT_PACKET_IN"
                 #rmsg.show()
                 pkt_in_msg = of.ofp_packet_in(body)
-                #pkt_in_msg.show()
+                pkt_in_msg.show()
                 raw = pkt_in_msg.load
                 pkt_parsed = of.Ether(raw)
-                #pkt_parsed.show()
                 #pkt_parsed.payload.show()
                 #print "to see if the payload of ether is IP"
                 #if isinstance(pkt_parsed.payload, of.IP):
@@ -113,14 +112,47 @@ def client_handler(address, fd, events):
                     message_queue_map[sock].put(str(pkt_out))
                 if isinstance(pkt_parsed.payload, of.IP):
                     if isinstance(pkt_parsed.payload.payload, of.ICMP):
+                        pkt_parsed.show()
                         pkt_out = of.ofp_header()/of.ofp_pktout_header()/of.ofp_action_output()
                         pkt_out.payload.payload.port = 0xfffb
                         pkt_out.payload.buffer_id = pkt_in_msg.buffer_id
                         pkt_out.payload.in_port = pkt_in_msg.in_port
                         pkt_out.length = 24
                         #pkt_out.show()
+                        #io_loop.update_handler(fd, io_loop.WRITE)
+                        #message_queue_map[sock].put(str(pkt_out))
+                        #usually don't have to fill in ``wilecards`` area 
+                        flow_mod_msg = of.ofp_header(type=14,
+                                                     length=80)/\
+                        of.ofp_flow_wildcards()\
+                        /of.ofp_match(in_port=pkt_in_msg.in_port,
+                                      dl_src=pkt_parsed.src,
+                                      dl_dst=pkt_parsed.dst,
+                                      #dl_vlan=pkt_parsed.,
+                                      #dl_vlan_pcp=pkt_parsed,
+                                      dl_type=pkt_parsed.type,
+                                      nw_tos=pkt_parsed.payload.tos,
+                                      nw_proto=pkt_parsed.payload.proto,
+                                      nw_src=pkt_parsed.payload.src,
+                                      nw_dst=pkt_parsed.payload.dst)\
+                        /of.ofp_flow_mod(command=0,
+                                         idle_timeout=60,
+                                         buffer_id=pkt_in_msg.buffer_id)\
+                        /of.ofp_action_output(type=0,
+                                              port=0xfffb,
+                                              len=8)
+                        flow_mod_msg.show()
+                        """"""
+                        print "--------------------------------------------------------------------------------------"
+                        print "len of flow_mod_msg        :", len(str(flow_mod_msg))
+                        print "len of of_header()         :", len(str(of.ofp_header()))
+                        print "len of ofp_flow_wildcards():", len(str(of.ofp_flow_wildcards()))
+                        print "len of ofp_match()         :", len(str(of.ofp_match()))
+                        print "len of ofp_flow_mod()      :", len(str(of.ofp_flow_mod(command=0,idle_timeout=60,buffer_id=pkt_in_msg.buffer_id)))
+                        print "len of ofp_action_output() :", len(str(of.ofp_action_output(type=0,port=0xfffb,len=8)))
+                        print "--------------------------------------------------------------------------------------"
                         io_loop.update_handler(fd, io_loop.WRITE)
-                        message_queue_map[sock].put(str(pkt_out))
+                        message_queue_map[sock].put(str(flow_mod_msg))
                 #io_loop.stop()
             if rmsg.type == 11: 
                 print "OFPT_FLOW_REMOVED"

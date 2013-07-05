@@ -20,6 +20,20 @@ ofp_port = { 0xff00: "OFPP_MAX",
              0xfffe: "OFPP_LOCAL",
              0xffff: "OFPP_NONE"}
 
+ofp_action_type = { 0: "OFPAT_OUTPUT",
+                    1: "OFPAT_SET_VLAN_VID",
+                    2: "OFPAT_SET_VLAN_PCP",
+                    3: "OFPAT_STRIP_VLAN",
+                    4: "OFPAT_SET_DL_SRC",
+                    5: "OFPAT_SET_DL_DST",
+                    6: "OFPAT_SET_NW_SRC",
+                    7: "OFPAT_SET_NW_DST",
+                    8: "OFPAT_SET_NW_TOS",
+                    9: "OFPAT_SET_TP_SRC",
+                    10: "OFPAT_SET_TP_DST",
+                    11: "OFPAT_ENQUEUE",
+                    0xffff: "OFPAT_VENDOR"}
+
 class ofp_phy_port(Packet):
     name = "OpenFlow Port"
     fields_desc=[ ShortEnumField("port_no", 0, ofp_port),
@@ -68,25 +82,48 @@ class ofp_phy_port(Packet):
                   #uint32_t for features advertised by peer
                   BitField("peer", 0, 32)]
 
-ofp_action_type = { 0: "OFPAT_OUTPUT",
-                    1: "OFPAT_SET_VLAN_VID",
-                    2: "OFPAT_SET_VLAN_PCP",
-                    3: "OFPAT_STRIP_VLAN",
-                    4: "OFPAT_SET_DL_SRC",
-                    5: "OFPAT_SET_DL_DST",
-                    6: "OFPAT_SET_NW_SRC",
-                    7: "OFPAT_SET_NW_DST",
-                    8: "OFPAT_SET_NW_TOS",
-                    9: "OFPAT_SET_TP_SRC",
-                    10: "OFPAT_SET_TP_DST",
-                    11: "OFPAT_ENQUEUE",
-                    0xffff: "OFPAT_VENDOR"}
+#should be a new field
+class ofp_flow_wildcards(Packet):
+    name = "OpenFlow Wildcards"
+    fields_desc=[ BitField("not_defined", 0, 10), 
+                  BitField("OFPFW_NW_TOS", 0, 1),      #1<<21 IP ToS (DSCP field, 6 bits 
+                  BitField("OFPFW_DL_VLAN_PCP", 0, 1), #1<<20 VLAN priority
+                  
+                  #indicating how many bits are not used in the mask
+                  BitField("OFPFW_NW_DST_MASK", 0, 6), #((1<<6)-1)<<14
+                  BitField("OFPFW_NW_SRC_MASK", 0, 6), #((1<<6)-1)<<8
 
-class ofp_action_header(Packet):
-    name = "OpenFlow Action Header"
-    fields_desc=[ ShortEnumField("type", 0, ofp_action_type),
-                  ShortField("len", 0), #length of this action (including this header)
-                  XByteField("pad", 0)]
+                  BitField("OFPFW_TP_DST", 0, 1),   #1<<7 TCP/UDP destination port
+                  BitField("OFPFW_TP_SRC", 0, 1),   #1<<6 TCP/UDP source port
+                  BitField("OFPFW_NW_PROTO", 0, 1), #1<<5 IP protocol
+                  BitField("OFPFW_DL_TYPE", 0, 1),  #1<<4 Ethernet frame type
+                  BitField("OFPFW_DL_DST",0, 1),    #1<<3 Ethernet destination address
+                  BitField("OFPFW_DL_SRC", 0, 1),   #1<<2 Ethernet source address
+                  BitField("OFPFW_DL_VLAN", 0, 1),  #1<<1 VLAN id
+                  BitField("OFPFW_IN_PORT", 0, 1)   #1<<0 Switch input port
+                ]
+
+#the first of the match field is wildcards. I changed it into another
+#layer(packet header) before ofp_match structure.
+class ofp_match(Packet):
+    name = "OpenFlow Match Field"
+    fields_desc=[ #should be one wildcards field, defined in the previous class
+                  ShortEnumField("in_port", 0, ofp_port),   #Input switch port
+                  MACField("dl_src", "00:00:00:00:00:00"),        #Ethernet source address
+                  MACField("dl_dst", "00:00:00:00:00:00"),        #Ethernet destination address
+                  ShortField("dl_vlan", 0),     #input VLAN id
+                  XByteField("dl_vlan_pcp", 0), #input VLAN priority
+                  XByteField("pad1", 0),        #Padding to align to 64 bits
+                  ShortField("dl_type", 0),     #Ethernet frame type
+                  XByteField("nw_tos", 0),      #IP ToS
+                  XByteField("nw_proto", 0),    #IP protocol or lower 8 bits of ARP
+                  XByteField("pad2.1", 0),      #Padding to align to 64 bits
+                  XByteField("pad2.2", 0),      #Padding to align to 64 bits
+                  IPField("nw_src","0.0.0.0"),  #IP source address
+                  IPField("nw_dst","0.0.0.0"),  #IP destination address
+                  ShortField("tp_src", 0),      #TCP/UDP source port
+                  ShortField("tp_dst", 0),      #TCP/UDP destination port
+                ]
 
 ###################
 # OpenFlow Header #
@@ -126,6 +163,12 @@ class ofp_header(Packet):
                  IntField("xid", 1) ]
 
 #OFP_HELLO, OFP_ECHO_REQUEST and OFP_FEATURES_REQUEST do not have a body.
+
+class ofp_action_header(Packet):
+    name = "OpenFlow Action Header"
+    fields_desc=[ ShortEnumField("type", 0, ofp_action_type),
+                  ShortField("len", 0), #length of this action (including this header)
+                  XByteField("pad", 0)]
 
 #####################
 # OpenFlow Messages #
@@ -182,6 +225,29 @@ class ofp_action_output(Packet):
 
 bind_layers( ofp_pktout_header, ofp_action_output, type=0)
 bind_layers( ofp_pktout_header, ofp_action_output, actions_len=8)
+
+# No. 14
+ofp_flow_mod_command = { 0: "OFPFC_ADD", #New flow
+                         1: "OFPFC_MODIFY", #Modify all matching flows
+                         2: "OFPFC_MODIFY_STRICT", #Modify entry strictly matching wildcards
+                         3: "OFPFC_DELETE", #Delete all matching flows
+                         4: "OFPFC_DELETE_STRICT" } #Strictly match wildcards and priority
+
+class ofp_flow_mod(Packet):
+    name = "OpenFlow Flow Modify"
+    fields_desc=[ BitField("not_defined", 0, 64), #Opaque controller-issued identifier
+                  #Flow Actions
+                  ShortEnumField("command", 0, ofp_flow_mod_command),
+                  ShortField("idle_timeout", 0),
+                  ShortField("hard_timeout", 0),
+                  ShortField("priority", 0),
+                  IntField("buffer_id", 0),
+                  ShortField("out_port", 0),
+                  #flags are important, the 1<<0 bit is OFPFF_SEND_FLOW_REM, send OFPT_FLOW_REMOVED
+                  #1<<1 bit is OFPFF_CHECK_OVERLAP, checking if the entries' field overlaps(among same priority)  
+                  #1<<2 bit is OFPFF_EMERG, used only switch disconnected with controller) 
+                  ShortField("flags", 0)
+                ]
 
 if __name__ == '__main__':
     a = ofp_header()
