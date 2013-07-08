@@ -9,13 +9,6 @@ import Queue
 
 fd_map = {}
 message_queue_map = {}
-#test for queue as middle layer
-import threading
-test_queue = {}
-e = threading.Event()
-_quit = False
-threads = {}
-#end of test
 
 def handle_connection(connection, address):
         print "1 connection,", connection, address
@@ -35,20 +28,9 @@ def client_handler(address, fd, events):
             """
             print "connection dropped"
             io_loop.remove_handler(fd)
-            #test for queue as middle ware
-            _quit = True
-            e.set()
-            print "event seted"
-            threads[fd].join
-            #end of test
         if len(data)<8:
             print "not a openflow message"
         else:
-            #test for queue as middle layer
-            test_queue[fd].put(data)
-            e.set()
-            
-            
             #print len(data)
             #if the data length is 8, then only of header
             #else, there are payload after the header
@@ -214,22 +196,6 @@ def client_handler(address, fd, events):
             #print 'sending "%s" to %s' % (of.ofp_header(next_msg).type, address)
             sock.send(next_msg)
 
-#testing for threading
-def switch_listen(fd):
-    while not _quit:
-        e.wait()
-        while not test_queue[fd].empty():
-            raw = test_queue[fd].get()
-            parsed = of.ofp_header(raw)
-            print "----------%s from thread----------" %parsed.type 
-        e.clear()
-    #test_queue[fd].put(data)
-    
-#def switch_threading(fd):
-    
-    
-
-#end of test
 
 def agent(sock, fd, events):
     #print fd, sock, events
@@ -246,20 +212,12 @@ def agent(sock, fd, events):
     io_loop.add_handler(connection.fileno(), client_handle, io_loop.READ)
     print "in agent: new switch", connection.fileno(), client_handle
     message_queue_map[connection] = Queue.Queue()
-    
-    #test for queue as middle layer
-    test_queue[connection.fileno()] = Queue.Queue()
-    t = threading.Thread(target=switch_listen, args=[connection.fileno(),])
-    threads[connection.fileno()] = t
-    t.start()
-    #end of test
 
 def new_sock(block):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock.setblocking(block)
     return sock
-
 
 if __name__ == '__main__':
     sock = new_sock(0)
