@@ -6,8 +6,16 @@ import libopenflow as of
 
 import Queue
 
+
 fd_map = {}
 message_queue_map = {}
+#test for queue as middle layer
+import threading
+test_queue = {}
+e = threading.Event()
+_quit = False
+threads = {}
+#end of test
 
 def handle_connection(connection, address):
         print "1 connection,", connection, address
@@ -27,9 +35,20 @@ def client_handler(address, fd, events):
             """
             print "connection dropped"
             io_loop.remove_handler(fd)
+            #test for queue as middle ware
+            _quit = True
+            e.set()
+            print "event seted"
+            threads[fd].join
+            #end of test
         if len(data)<8:
             print "not a openflow message"
         else:
+            #test for queue as middle layer
+            test_queue[fd].put(data)
+            e.set()
+            
+            
             #print len(data)
             #if the data length is 8, then only of header
             #else, there are payload after the header
@@ -126,6 +145,7 @@ def client_handler(address, fd, events):
                         io_loop.update_handler(fd, io_loop.WRITE)
                         message_queue_map[sock].put(str(pkt_out))
                         """
+                        print pkt_parsed.payload.proto, "ICMP protocol"
                         #pkt_out.show()
                         #usually don't have to fill in ``wilecards`` area 
                         flow_mod_msg = of.ofp_header(type=14,
@@ -139,9 +159,12 @@ def client_handler(address, fd, events):
                                       nw_proto=pkt_parsed.payload.proto,
                                       nw_src=pkt_parsed.payload.src,
                                       nw_dst=pkt_parsed.payload.dst)\
-                        /of.ofp_flow_mod(command=0,
-                                         buffer_id=pkt_in_msg.buffer_id)\
-                        /of.ofp_action_output(type=0,
+                        /of.ofp_flow_mod(cookie=250,
+                                         command=0,
+                                         idle_timeout=60,
+                                         buffer_id=pkt_in_msg.buffer_id,#icmp type 8: request, 0: reply
+                                         flags=1)\
+                        /of.ofp_action_output(type=0, 
                                               port=0xfffb,
                                               len=8)
                         """flow_mod_msg.show()
@@ -191,6 +214,23 @@ def client_handler(address, fd, events):
             #print 'sending "%s" to %s' % (of.ofp_header(next_msg).type, address)
             sock.send(next_msg)
 
+#testing for threading
+def switch_listen(fd):
+    while not _quit:
+        e.wait()
+        while not test_queue[fd].empty():
+            raw = test_queue[fd].get()
+            parsed = of.ofp_header(raw)
+            print "----------%s from thread----------" %parsed.type 
+        e.clear()
+    #test_queue[fd].put(data)
+    
+#def switch_threading(fd):
+    
+    
+
+#end of test
+
 def agent(sock, fd, events):
     #print fd, sock, events
     try:
@@ -206,6 +246,13 @@ def agent(sock, fd, events):
     io_loop.add_handler(connection.fileno(), client_handle, io_loop.READ)
     print "in agent: new switch", connection.fileno(), client_handle
     message_queue_map[connection] = Queue.Queue()
+    
+    #test for queue as middle layer
+    test_queue[connection.fileno()] = Queue.Queue()
+    t = threading.Thread(target=switch_listen, args=[connection.fileno(),])
+    threads[connection.fileno()] = t
+    t.start()
+    #end of test
 
 def new_sock(block):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
@@ -225,3 +272,4 @@ if __name__ == '__main__':
     print sock, sock.getsockname()
     io_loop.add_handler(sock.fileno(), callback, io_loop.READ)
     io_loop.start()
+    

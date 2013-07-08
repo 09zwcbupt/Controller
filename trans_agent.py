@@ -58,7 +58,7 @@ class switch():
             else:
                 rmsg = of.ofp_header(data)
                 # Here, we can manipulate OpenFlow packets from CONTROLLER.
-                #rmsg.show()
+                rmsg.show()
                 io_loop.update_handler(self.fd_sw, io_loop.WRITE)
                 self.queue_sw.put(str(data))
     
@@ -84,6 +84,7 @@ class switch():
                 io_loop.remove_handler(self.fd_con)
             else:
                 rmsg = of.ofp_header(data)
+                rmsg.show()
                 # Here, we can manipulate OpenFlow packets from SWITCH.
                 io_loop.update_handler(self.fd_con, io_loop.WRITE)
                 self.queue_con.put(str(data))

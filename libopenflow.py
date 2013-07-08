@@ -241,7 +241,7 @@ bind_layers( ofp_pktout_header, ofp_action_output, actions_len=8)
 
 class ofp_flow_mod(Packet):
     name = "OpenFlow Flow Modify"
-    fields_desc=[ BitField("not_defined", 0, 64), #Opaque controller-issued identifier
+    fields_desc=[ BitField("cookie", 0, 64), #Opaque controller-issued identifier
                   #Flow Actions
                   ShortEnumField("command", 0, ofp_flow_mod_command),
                   ShortField("idle_timeout", 60),
