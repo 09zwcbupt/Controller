@@ -6,7 +6,30 @@ from scapy.all import *
 #uint16_t => ShortField, BitFieldLenField('name', None, 16, length_of='varfield')
 #uint32_t => IntField, BitFieldLenField('name', None, 32, length_of='varfield'),
 
-
+"""
+none    "OFPT_HELLO",
+okay    "OFPT_ERROR",
+none    "OFPT_ECHO_REQUEST",
+none    "OFPT_ECHO_REPLY",
+        "OFPT_VENDOR",
+okay    "OFPT_FEATURES_REQUEST",
+        "OFPT_FEATURES_REPLY",
+        "OFPT_GET_CONFIG_REQUEST",
+        "OFPT_GET_CONFIG_REPLY",
+        "OFPT_SET_CONFIG",
+okay    "OFPT_PACKET_IN",
+        "OFPT_FLOW_REMOVED",
+        "OFPT_PORT_STATUS",
+okay    "OFPT_PACKET_OUT",# with action header
+okay    "OFPT_FLOW_MOD",
+        "OFPT_PORT_MOD",
+        "OFPT_STATS_REQUEST",
+        "OFPT_STATS_REPLY",
+        "OFPT_BARRIER_REQUEST",
+        "OFPT_BARRIER_REPLY",
+        "OFPT_QUEUE_GET_CONFIG_REQUEST",
+        "OFPT_QUEUE_GET_CONFIG_REPLY"
+"""
 
 
 ###################
@@ -68,6 +91,49 @@ ofp_flow_mod_command = { 0: "OFPFC_ADD", #New flow
                          2: "OFPFC_MODIFY_STRICT", #Modify entry strictly matching wildcards
                          3: "OFPFC_DELETE", #Delete all matching flows
                          4: "OFPFC_DELETE_STRICT" } #Strictly match wildcards and priority
+
+ofp_error_type = { 0: "OFPET_HELLO_FAILED",
+                   1: "OFPET_BAD_REQUEST",
+                   2: "OFPET_BAD_ACTION",
+                   3: "OFPET_FLOW_MOD_FAILED",
+                   4: "OFPET_PORT_MOD_FAILED",
+                   5: "OFPET_QUEUE_OP_FAILED"}
+
+ofp_hello_failed_code = { 0: "OFPHFC_INCOMPATIBLE",
+                          1: "OFPHFC_EPERM"}
+
+ofp_bad_request_code = { 0: "OFPBRC_BAD_VERSION",
+                         1: "OFPBRC_BAD_TYPE",
+                         2: "OFPBRC_BAD_STAT",
+                         3: "OFPBRC_BAD_VENDOR",
+                         4: "OFPBRC_BAD_SUBTYPE",
+                         5: "OFPBRC_EPERM",
+                         6: "OFPBRC_BAD_LEN",
+                         7: "OFPBRC_BUFFER_EMPTY",
+                         8: "OFPBRC_BUFFER_UNKNOWN"}
+
+ofp_bad_action_code = { 0: "OFPBAC_BAD_TYPE",
+                        1: "OFPBAC_BAD_LEN",
+                        2: "OFPBAC_BAD_VENDOR",
+                        3: "OFPBAC_BAD_VENDOR_TYPE",
+                        4: "OFPBAC_BAD_OUT_PORT",
+                        6: "OFPBAC_BAD_ARGUMENT",
+                        7: "OFPBAC_EPERM", #permissions error
+                        8: "OFPBAC_TOOMANY",
+                        9: "OFPBAC_BAD_QUEUE"}
+
+ofp_flow_mod_failed_code = { 0: "OFPFMFC_ALL_TABLES_FULL",
+                             1: "OFPFMFC_OVERLAP",
+                             2: "OFPFMFC_EPERM",
+                             3: "OFPFMFC_BAD_EMERG_TIMEOUT",
+                             4: "OFPFMFC_BAD_COMMAND",
+                             5: "OFPFMFC_UNSUPPORT"}
+
+ofp_port_mod_failed_code = { 0: "OFPPMFC_BAD_PORT",
+                             1: "OFPPFMC_BAD_HW_ADDR"}
+
+ofp_queue_op_failed_code = { 0: "OFPQOFC_BAD_PORT",
+                             1: "OFPQOFC_BAD_QUEUE"}
 
 class ofp_phy_port(Packet):
     name = "OpenFlow Port"
@@ -190,7 +256,17 @@ class ofp_action_header(Packet):
 # OpenFlow Messages #
 #####################
 
+# No. 1
+# [header|error_msg]
+class ofp_error_msg(Packet):
+    name = "OpenFlow Error Message"
+    fields_desc=[ ShortEnumField("type", 0, ofp_error_type),
+                  ShortField("code", 0), #need to parse with type field, use another function
+                  StrFixedLenField("data", None, length=8)]
+bind_layers( ofp_header, ofp_error_msg, type=1 )
+
 # No. 6
+# [header|features_reply|port]
 class ofp_features_reply(Packet):
     name = "OpenFlow Switch Features Reply"
     """
