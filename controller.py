@@ -12,6 +12,8 @@ message_queue_map = {}
 #test for queue as middle layer
 import threading
 test_queue = {}
+#for output packet
+out_queue = {}
 e = threading.Event()
 _quit = False
 threads = {}
@@ -47,11 +49,14 @@ def client_handler(address, fd, events):
             #test for queue as middle layer
             test_queue[fd].put(data)
             e.set()
-            
-            
+            #io_loop.update_handler(fd, io_loop.WRITE)
+        
+def control_logic(data, fd):
+    if not data == "done":
             #print len(data)
             #if the data length is 8, then only of header
             #else, there are payload after the header
+            return_msg = []
             if len(data)>8:
                 rmsg = of.ofp_header(data[0:8])
                 body = data[8:]
@@ -61,13 +66,18 @@ def client_handler(address, fd, events):
             if rmsg.type == 0:
                 print "OFPT_HELLO"
                 msg = of.ofp_header(type = 5)
-                io_loop.update_handler(fd, io_loop.WRITE)
-                message_queue_map[sock].put(data)
-                message_queue_map[sock].put(str(msg))
+                return_msg.append(data) 
+                return_msg.append(str(msg))
+                return return_msg
+                #io_loop.update_handler(fd, io_loop.WRITE)
+                #message_queue_map[sock].put(data)
+                #message_queue_map[sock].put(str(msg))
             if rmsg.type == 1:
                 print "OFPT_ERROR"
+                return return_msg
             if rmsg.type == 5:
                 print "OFPT_FEATURES_REQUEST"
+                return return_msg
             if rmsg.type == 6:
                 print "OFPT_FEATURES_REPLY"
                 #print "rmsg.load:",len(body)/48
@@ -90,20 +100,28 @@ def client_handler(address, fd, events):
             if rmsg.type == 2:
                 print "OFPT_ECHO_REQUEST"
                 msg = of.ofp_header(type=3, xid=rmsg.xid)
-                io_loop.update_handler(fd, io_loop.WRITE)
-                message_queue_map[sock].put(str(msg))
+                #io_loop.update_handler(fd, io_loop.WRITE)
+                #message_queue_map[sock].put(str(msg))
+                return_msg.append(str(msg))
+                return return_msg
             if rmsg.type == 3:
                 print "OFPT_ECHO_REPLY"
+                return return_msg
             if rmsg.type == 4:
                 print "OFPT_VENDOR"
+                return return_msg
             if rmsg.type == 6:
                 print "OFPT_FEATURES_REPLY"
+                return return_msg
             if rmsg.type == 7:
                 print "OFPT_GET_CONFIG_REQUEST"
+                return return_msg
             if rmsg.type == 8:
                 print "OFPT_GET_CONFIG_REPLY"
+                return return_msg
             if rmsg.type == 9:
                 print "OFPT_SET_CONFIG"
+                return return_msg
             if rmsg.type == 10:
                 print "OFPT_PACKET_IN"
                 #rmsg.show()
@@ -123,8 +141,9 @@ def client_handler(address, fd, events):
                     pkt_out.payload.in_port = pkt_in_msg.in_port
                     pkt_out.length = 24
                     #pkt_out.show()
-                    io_loop.update_handler(fd, io_loop.WRITE)
-                    message_queue_map[sock].put(str(pkt_out))
+                    #io_loop.update_handler(fd, io_loop.WRITE)
+                    #message_queue_map[sock].put(str(pkt_out))
+                    return [str(pkt_out),]
                 if isinstance(pkt_parsed.payload, of.IP):
                     if isinstance(pkt_parsed.payload.payload, of.ICMP):
                         print "from", pkt_parsed.src, "to", pkt_parsed.dst 
@@ -178,56 +197,88 @@ def client_handler(address, fd, events):
                         print "len of ofp_action_output() :", len(str(of.ofp_action_output(type=0,port=0xfffb,len=8)))
                         print "--------------------------------------------------------------------------------------"
                         """
-                        io_loop.update_handler(fd, io_loop.WRITE)
-                        message_queue_map[sock].put(str(flow_mod_msg))
+                        return_msg.append(str(flow_mod_msg))
+                        return return_msg
+                        #io_loop.update_handler(fd, io_loop.WRITE)
+                        #message_queue_map[sock].put(str(flow_mod_msg))
                 #io_loop.stop()
             if rmsg.type == 11: 
                 print "OFPT_FLOW_REMOVED"
+                return return_msg
             if rmsg.type == 12:
                 print "OFPT_PORT_STATUS"
+                return return_msg
             if rmsg.type == 13:
                 print "OFPT_PACKET_OUT"
+                return return_msg
             if rmsg.type == 14:
                 print "OFPT_FLOW_MOD"
+                return return_msg
             if rmsg.type == 15:
                 print "OFPT_PORT_MOD"
+                return return_msg
             if rmsg.type == 16:
                 print "OFPT_STATS_REQUEST"
+                return return_msg
             if rmsg.type == 17:
                 print "OFPT_STATS_REPLY"
+                return return_msg
             if rmsg.type == 18:
                 print "OFPT_BARRIER_REQUEST"
+                return return_msg
             if rmsg.type == 19:
                 print "OFPT_BARRIER_REPLY"
+                return return_msg
             if rmsg.type == 20:
                 print "OFPT_QUEUE_GET_CONFIG_REQUEST"
+                return return_msg
             if rmsg.type == 21:
                 print "OFPT_QUEUE_GET_CONFIG_REPLY"
-
-    if events & io_loop.WRITE:
-        try:
-            next_msg = message_queue_map[sock].get_nowait()
-        except Queue.Empty:
+                return return_msg
+            else:
+                return return_msg
+    
+    #if events & io_loop.WRITE:
+    else:
+        io_loop.update_handler(fd, io_loop.READ)
+        #try:
+            #next_msg = message_queue_map[sock].get_nowait()
+        #except Queue.Empty:
             #print "%s queue empty" % str(address)
-            io_loop.update_handler(fd, io_loop.READ)
-        else:
+            #io_loop.update_handler(fd, io_loop.READ)
+        #else:
             #print 'sending "%s" to %s' % (of.ofp_header(next_msg).type, address)
-            sock.send(next_msg)
+            #sock.send(next_msg)
 
 #testing for threading
 def switch_listen(fd):
     while not _quit:
         e.wait()
         while not test_queue[fd].empty():
+            sock = fd_map[fd]
             raw = test_queue[fd].get()
             parsed = of.ofp_header(raw)
             print "----------%s from thread----------" %parsed.type 
+            pkt_out = control_logic(raw, fd)
+            print pkt_out
+            while len(pkt_out)>0:
+                msg = pkt_out.pop()
+                sock.send(msg)#can send packet out, blocked?
+                print "sent"
+        #io_loop.update_handler(fd, io_loop.READ)
+        control_logic("done",fd)
         e.clear()
     #test_queue[fd].put(data)
     
 #def switch_threading(fd):
     
-    
+e2 = threading.Event()
+countrr = 0
+def handle_writing(sock, fd, events):
+    global countrr
+    countrr = countrr + 1
+    print "received a writing request", countrr
+    #e2.wait()
 
 #end of test
 
@@ -269,7 +320,9 @@ if __name__ == '__main__':
     io_loop = ioloop.IOLoop.instance()
     #callback = functools.partial(connection_ready, sock)
     callback = functools.partial(agent, sock)
+    #another_callback = functools.partial(handle_writing, sock)
     print sock, sock.getsockname()
     io_loop.add_handler(sock.fileno(), callback, io_loop.READ)
+    #io_loop.add_handler(sock.fileno(), another_callback, io_loop.WRITE)
     io_loop.start()
     
