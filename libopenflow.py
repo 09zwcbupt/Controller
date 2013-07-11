@@ -236,9 +236,9 @@ class ofp_match(Packet):
 class ofp_header(Packet):
     name = "OpenFlow Header "
     fields_desc=[ XByteField("version", 1),
-                 ByteEnumField("type", 0, ofp_type),
-                 ShortField("length", 8),
-                 IntField("xid", 1) ]
+                  ByteEnumField("type", 0, ofp_type),
+                  ShortField("length", 8),
+                  IntField("xid", 1) ]
 
 #OFP_HELLO, OFP_ECHO_REQUEST and OFP_FEATURES_REQUEST do not have a body.
 
@@ -332,7 +332,122 @@ class ofp_flow_mod(Packet):
                 ]
 
 
+####################
+# Useful Functions #
+####################
 
+"""
+0    none    "OFPT_HELLO",               8 bytes
+1    okay    "OFPT_ERROR",               8 + 12 bytes
+2    none    "OFPT_ECHO_REQUEST",
+3    none    "OFPT_ECHO_REPLY",
+4            "OFPT_VENDOR",
+5    okay    "OFPT_FEATURES_REQUEST",
+6            "OFPT_FEATURES_REPLY",
+7            "OFPT_GET_CONFIG_REQUEST",
+8            "OFPT_GET_CONFIG_REPLY",
+9            "OFPT_SET_CONFIG",
+10   okay    "OFPT_PACKET_IN",
+11           "OFPT_FLOW_REMOVED",
+12           "OFPT_PORT_STATUS",
+13   okay    "OFPT_PACKET_OUT",# with action header
+14   okay    "OFPT_FLOW_MOD",
+15           "OFPT_PORT_MOD",
+16           "OFPT_STATS_REQUEST",
+17           "OFPT_STATS_REPLY",
+18           "OFPT_BARRIER_REQUEST",
+19           "OFPT_BARRIER_REPLY",
+20           "OFPT_QUEUE_GET_CONFIG_REQUEST",
+21           "OFPT_QUEUE_GET_CONFIG_REPLY"
+"""
+
+
+def parse(unparsed):
+    if len(unparsed) < 8:
+        return ''  #indicating unparsed pkt is not of packet
+    else:
+        header = ofp_header(unparsed[:8]) #first 8 bytes are ofp_header, else are header.payload 
+        if header.type == 0:
+            print "OFPT_HELLO" # only 8 bytes
+            #return header
+        
+        elif header.type == 1:
+            print "OFPT_ERROR"
+            error = ofp_error_msg(unparsed[8:20])
+            #return header/error
+        
+        elif header.type == 2:
+            print "OFPT_ECHO_REQUEST"
+            #return header
+        
+        elif header.type == 3:
+            print "OFPT_ECHO_REPLY"
+            #return header
+        
+        elif header.type == 4:
+            print "OFPT_VENDOR"
+        
+        elif header.type == 5:
+            print "OFPT_FEATURES_REQUEST"
+        
+        elif header.type == 6:
+            print "OFPT_FEATURES_REPLY"
+            
+        
+        elif header.type == 7:
+            print "OFPT_GET_CONFIG_REQUEST"
+        
+        elif header.type == 8:
+            print "OFPT_GET_CONFIG_REPLY"
+        
+        elif header.type == 9:
+            print "OFPT_SET_CONFIG"
+        
+        elif header.type == 10:
+            print "OFPT_PACKET_IN"
+            
+        
+        elif header.type == 11:
+            print "OFPT_FLOW_REMOVED"
+            
+        
+        elif header.type == 12:
+            print "OFPT_PORT_STATUS"
+            
+        
+        elif header.type == 13:
+            print "OFPT_PACKET_OUT"
+        
+        elif header.type == 14:
+            print "OFPT_FLOW_MOD"
+        
+        elif header.type == 15:
+            print "OFPT_PORT_MOD"
+        
+        elif header.type == 16:
+            print "OFPT_STATS_REQUEST"
+        
+        elif header.type == 17:
+            print "OFPT_STATS_REPLY"
+        
+        elif header.type == 18:
+            print "OFPT_BARRIER_REQUEST"
+        
+        elif header.type == 19:
+            print "OFPT_BARRIER_REPLY"
+            
+        
+        elif header.type == 20:
+            print "OFPT_QUEUE_GET_CONFIG_REQUEST"
+        
+        elif header.type == 21:
+            print "OFPT_QUEUE_GET_CONFIG_REPLY"
+
+        
+            
+            
+    
+    
 if __name__ == '__main__':
     a = ofp_header()
     a.show()

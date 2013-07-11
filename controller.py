@@ -177,10 +177,14 @@ def client_handler(address, fd, events):
                 print "OFPT_STATS_REQUEST"
             if rmsg.type == 17:
                 print "OFPT_STATS_REPLY"
+            
+            # no message body
             if rmsg.type == 18:
                 print "OFPT_BARRIER_REQUEST"
+            
+            #no message body
             if rmsg.type == 19:
-                print "OFPT_BARRIER_REPLY"
+                print "OFPT_BARRIER_REPLY: ", rmsg.xid, "Successful"
             if rmsg.type == 20:
                 print "OFPT_QUEUE_GET_CONFIG_REQUEST"
             if rmsg.type == 21:
