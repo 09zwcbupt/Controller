@@ -324,5 +324,9 @@ if __name__ == '__main__':
     print sock, sock.getsockname()
     io_loop.add_handler(sock.fileno(), callback, io_loop.READ)
     #io_loop.add_handler(sock.fileno(), another_callback, io_loop.WRITE)
-    io_loop.start()
-    
+    try:
+        io_loop.start()
+    except KeyboardInterrupt:
+        io_loop.stop()
+        print "quit"
+        
