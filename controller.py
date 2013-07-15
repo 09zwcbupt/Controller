@@ -233,5 +233,9 @@ if __name__ == '__main__':
     callback = functools.partial(agent, sock)
     print sock, sock.getsockname()
     io_loop.add_handler(sock.fileno(), callback, io_loop.READ)
-    io_loop.start()
+    try:
+        io_loop.start()
+    except KeyboardInterrupt:
+        io_loop.stop()
+        print "quit"
     
