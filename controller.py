@@ -5,10 +5,11 @@ import socket
 import libopenflow as of
 
 import Queue
-
+import time
 
 fd_map = {}
 message_queue_map = {}
+pkt_out = of.ofp_header()/of.ofp_pktout_header()/of.ofp_action_output()
 
 def handle_connection(connection, address):
         print "1 connection,", connection, address
@@ -46,11 +47,11 @@ def client_handler(address, fd, events):
                 io_loop.update_handler(fd, io_loop.WRITE)
                 message_queue_map[sock].put(data)
                 message_queue_map[sock].put(str(msg))
-            if rmsg.type == 1:
+            elif rmsg.type == 1:
                 print "OFPT_ERROR"
-            if rmsg.type == 5:
+            elif rmsg.type == 5:
                 print "OFPT_FEATURES_REQUEST"
-            if rmsg.type == 6:
+            elif rmsg.type == 6:
                 print "OFPT_FEATURES_REPLY"
                 #print "rmsg.load:",len(body)/48
                 msg = of.ofp_features_reply(body[0:24])#length of reply msg
@@ -69,25 +70,25 @@ def client_handler(address, fd, events):
                     #port_info[i].show()
                     #print port_info[i].OFPPC_PORT_DOWN
 
-            if rmsg.type == 2:
+            elif rmsg.type == 2:
                 print "OFPT_ECHO_REQUEST"
                 msg = of.ofp_header(type=3, xid=rmsg.xid)
                 io_loop.update_handler(fd, io_loop.WRITE)
                 message_queue_map[sock].put(str(msg))
-            if rmsg.type == 3:
+            elif rmsg.type == 3:
                 print "OFPT_ECHO_REPLY"
-            if rmsg.type == 4:
+            elif rmsg.type == 4:
                 print "OFPT_VENDOR"
-            if rmsg.type == 6:
+            elif rmsg.type == 6:
                 print "OFPT_FEATURES_REPLY"
-            if rmsg.type == 7:
+            elif rmsg.type == 7:
                 print "OFPT_GET_CONFIG_REQUEST"
-            if rmsg.type == 8:
+            elif rmsg.type == 8:
                 print "OFPT_GET_CONFIG_REPLY"
-            if rmsg.type == 9:
+            elif rmsg.type == 9:
                 print "OFPT_SET_CONFIG"
-            if rmsg.type == 10:
-                print "OFPT_PACKET_IN"
+            elif rmsg.type == 10:
+                #print "OFPT_PACKET_IN"
                 #rmsg.show()
                 pkt_in_msg = of.ofp_packet_in(body)
                 #pkt_in_msg.show()
@@ -99,7 +100,7 @@ def client_handler(address, fd, events):
                     #pkt_parsed.show()
                 if isinstance(pkt_parsed.payload, of.ARP):
                     #pkt_parsed.show()
-                    pkt_out = of.ofp_header()/of.ofp_pktout_header()/of.ofp_action_output()
+                    #pkt_out = of.ofp_header()/of.ofp_pktout_header()/of.ofp_action_output()
                     pkt_out.payload.payload.port = 0xfffb
                     pkt_out.payload.buffer_id = pkt_in_msg.buffer_id
                     pkt_out.payload.in_port = pkt_in_msg.in_port
@@ -109,23 +110,24 @@ def client_handler(address, fd, events):
                     message_queue_map[sock].put(str(pkt_out))
                 if isinstance(pkt_parsed.payload, of.IP):
                     if isinstance(pkt_parsed.payload.payload, of.ICMP):
-                        print "from", pkt_parsed.src, "to", pkt_parsed.dst 
+                        #print "from", pkt_parsed.src, "to", pkt_parsed.dst 
                         
                         """
                         When receive a OPF_PACKET_IN message, you can caculate a path, and then
                         use OFP_FLOW_MOD message to install path. Also, you can find out the exact
                         port to send the message, then you can use the following code to send a
                         OFP_PACKET_OUT message and send the packet to destination.
-                         
-                        pkt_parsed.show()
-                        pkt_out = of.ofp_header()/of.ofp_pktout_header()/of.ofp_action_output()
+                        """
+                        #pkt_parsed.show()
+                        #pkt_out = of.ofp_header()/of.ofp_pktout_header()/of.ofp_action_output()
                         pkt_out.payload.payload.port = 0xfffb
                         pkt_out.payload.buffer_id = pkt_in_msg.buffer_id
                         pkt_out.payload.in_port = pkt_in_msg.in_port
                         pkt_out.length = 24
-
+                        """
                         io_loop.update_handler(fd, io_loop.WRITE)
                         message_queue_map[sock].put(str(pkt_out))
+                        """
                         """
                         print pkt_parsed.payload.proto, "ICMP protocol"
                         #pkt_out.show()
@@ -149,6 +151,7 @@ def client_handler(address, fd, events):
                         /of.ofp_action_output(type=0, 
                                               port=0xfffb,
                                               len=8)
+                        """
                         """flow_mod_msg.show()
                         
                         print "--------------------------------------------------------------------------------------"
@@ -161,33 +164,34 @@ def client_handler(address, fd, events):
                         print "--------------------------------------------------------------------------------------"
                         """
                         io_loop.update_handler(fd, io_loop.WRITE)
-                        message_queue_map[sock].put(str(flow_mod_msg))
+                        message_queue_map[sock].put(str(pkt_out))
                 #io_loop.stop()
-            if rmsg.type == 11: 
+
+            elif rmsg.type == 11: 
                 print "OFPT_FLOW_REMOVED"
-            if rmsg.type == 12:
+            elif rmsg.type == 12:
                 print "OFPT_PORT_STATUS"
-            if rmsg.type == 13:
+            elif rmsg.type == 13:
                 print "OFPT_PACKET_OUT"
-            if rmsg.type == 14:
+            elif rmsg.type == 14:
                 print "OFPT_FLOW_MOD"
-            if rmsg.type == 15:
+            elif rmsg.type == 15:
                 print "OFPT_PORT_MOD"
-            if rmsg.type == 16:
+            elif rmsg.type == 16:
                 print "OFPT_STATS_REQUEST"
-            if rmsg.type == 17:
+            elif rmsg.type == 17:
                 print "OFPT_STATS_REPLY"
             
             # no message body
-            if rmsg.type == 18:
+            elif rmsg.type == 18:
                 print "OFPT_BARRIER_REQUEST"
             
             #no message body
-            if rmsg.type == 19:
+            elif rmsg.type == 19:
                 print "OFPT_BARRIER_REPLY: ", rmsg.xid, "Successful"
-            if rmsg.type == 20:
+            elif rmsg.type == 20:
                 print "OFPT_QUEUE_GET_CONFIG_REQUEST"
-            if rmsg.type == 21:
+            elif rmsg.type == 21:
                 print "OFPT_QUEUE_GET_CONFIG_REPLY"
 
     if events & io_loop.WRITE:
@@ -199,7 +203,6 @@ def client_handler(address, fd, events):
         else:
             #print 'sending "%s" to %s' % (of.ofp_header(next_msg).type, address)
             sock.send(next_msg)
-
 
 def agent(sock, fd, events):
     #print fd, sock, events
@@ -238,4 +241,3 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         io_loop.stop()
         print "quit"
-    
