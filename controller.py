@@ -10,6 +10,7 @@ import time
 fd_map = {}
 message_queue_map = {}
 pkt_out = of.ofp_header()/of.ofp_pktout_header()/of.ofp_action_output()
+cookie = 0
 
 def handle_connection(connection, address):
         print "1 connection,", connection, address
@@ -110,13 +111,14 @@ def client_handler(address, fd, events):
                     message_queue_map[sock].put(str(pkt_out))
                 if isinstance(pkt_parsed.payload, of.IP):
                     if isinstance(pkt_parsed.payload.payload, of.ICMP):
-                        #print "from", pkt_parsed.src, "to", pkt_parsed.dst 
+                        print "from", pkt_parsed.src, "to", pkt_parsed.dst 
                         
                         """
                         When receive a OPF_PACKET_IN message, you can caculate a path, and then
                         use OFP_FLOW_MOD message to install path. Also, you can find out the exact
                         port to send the message, then you can use the following code to send a
                         OFP_PACKET_OUT message and send the packet to destination.
+                        """
                         """
                         #pkt_parsed.show()
                         #pkt_out = of.ofp_header()/of.ofp_pktout_header()/of.ofp_action_output()
@@ -125,13 +127,18 @@ def client_handler(address, fd, events):
                         pkt_out.payload.in_port = pkt_in_msg.in_port
                         pkt_out.length = 24
                         """
+                        """
                         io_loop.update_handler(fd, io_loop.WRITE)
                         message_queue_map[sock].put(str(pkt_out))
                         """
-                        """
-                        print pkt_parsed.payload.proto, "ICMP protocol"
+                        
+                        #print pkt_parsed.payload.proto
+                        #pkt_parsed.show()
+                        #print "ICMP protocol"
                         #pkt_out.show()
                         #usually don't have to fill in ``wilecards`` area 
+                        global cookie
+                        cookie += 1
                         flow_mod_msg = of.ofp_header(type=14,
                                                      length=80)/\
                         of.ofp_flow_wildcards()\
@@ -142,8 +149,10 @@ def client_handler(address, fd, events):
                                       nw_tos=pkt_parsed.payload.tos,
                                       nw_proto=pkt_parsed.payload.proto,
                                       nw_src=pkt_parsed.payload.src,
-                                      nw_dst=pkt_parsed.payload.dst)\
-                        /of.ofp_flow_mod(cookie=250,
+                                      nw_dst=pkt_parsed.payload.dst,
+                                      tp_src = pkt_parsed.payload.payload.type,
+                                      tp_dst = pkt_parsed.payload.payload.code)\
+                        /of.ofp_flow_mod(cookie=cookie,
                                          command=0,
                                          idle_timeout=60,
                                          buffer_id=pkt_in_msg.buffer_id,#icmp type 8: request, 0: reply
@@ -151,7 +160,6 @@ def client_handler(address, fd, events):
                         /of.ofp_action_output(type=0, 
                                               port=0xfffb,
                                               len=8)
-                        """
                         """flow_mod_msg.show()
                         
                         print "--------------------------------------------------------------------------------------"
@@ -164,7 +172,8 @@ def client_handler(address, fd, events):
                         print "--------------------------------------------------------------------------------------"
                         """
                         io_loop.update_handler(fd, io_loop.WRITE)
-                        message_queue_map[sock].put(str(pkt_out))
+                        #message_queue_map[sock].put(str(pkt_out))
+                        message_queue_map[sock].put(str(flow_mod_msg))
                 #io_loop.stop()
 
             elif rmsg.type == 11: 
