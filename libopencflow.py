@@ -6,32 +6,6 @@ from scapy.all import *
 #uint16_t => ShortField, BitFieldLenField('name', None, 16, length_of='varfield')
 #uint32_t => IntField, BitFieldLenField('name', None, 32, length_of='varfield'),
 
-"""
-none    "OFPT_HELLO",
-okay    "OFPT_ERROR",
-none    "OFPT_ECHO_REQUEST",
-none    "OFPT_ECHO_REPLY",
-        "OFPT_VENDOR",
-okay    "OFPT_FEATURES_REQUEST",
-        "OFPT_FEATURES_REPLY",
-        "OFPT_GET_CONFIG_REQUEST",
-        "OFPT_GET_CONFIG_REPLY",
-        "OFPT_SET_CONFIG",
-okay    "OFPT_PACKET_IN",
-        "OFPT_FLOW_REMOVED",
-        "OFPT_PORT_STATUS",
-okay    "OFPT_PACKET_OUT",# with action header
-okay    "OFPT_FLOW_MOD",
-        "OFPT_PORT_MOD",
-        "OFPT_STATS_REQUEST",
-        "OFPT_STATS_REPLY",
-        "OFPT_BARRIER_REQUEST",
-        "OFPT_BARRIER_REPLY",
-        "OFPT_QUEUE_GET_CONFIG_REQUEST",
-        "OFPT_QUEUE_GET_CONFIG_REPLY"
-"""
-
-
 ###################
 # Data Structures #
 ###################
@@ -57,7 +31,9 @@ ofp_type = { 0: "OFPT_HELLO",
              18: "OFPT_BARRIER_REQUEST",
              19: "OFPT_BARRIER_REPLY",
              20: "OFPT_QUEUE_GET_CONFIG_REQUEST",
-             21: "OFPT_QUEUE_GET_CONFIG_REPLY"}
+             21: "OFPT_QUEUE_GET_CONFIG_REPLY",
+             0xfe: "OFPT_CPORT_STATUS",
+             0xff: "OFPT_CFLOW_MOD"}
 
 ofp_port = { 0xff00: "OFPP_MAX",
              0xfff8: "OFPP_IN_PORT",
@@ -71,7 +47,9 @@ ofp_port = { 0xff00: "OFPP_MAX",
 
 ofp_port_reason = { 1: "OFPPR_ADD",
                     2: "OFPPR_DELETE",
-                    3: "OFPPR_MODIFY"}
+                    3: "OFPPR_MODIFY",
+                    254: "OFPPR_BW_MODIFY",
+                    255: "OFPPR_BW_DOWN"}
 
 ofp_action_type = { 0: "OFPAT_OUTPUT",
                     1: "OFPAT_SET_VLAN_VID",
@@ -94,7 +72,8 @@ ofp_flow_mod_command = { 0: "OFPFC_ADD",            # New flow
                          1: "OFPFC_MODIFY",         # Modify all matching flows
                          2: "OFPFC_MODIFY_STRICT",  # Modify entry strictly matching wildcards
                          3: "OFPFC_DELETE",         # Delete all matching flows
-                         4: "OFPFC_DELETE_STRICT"}  # Strictly match wildcards and priority
+                         4: "OFPFC_DELETE_STRICT",  # Strictly match wildcards and priority
+                         0xffff: "OFPFC_DROP"}      # Terminate a circuit flow
 
 ofp_error_type = { 0: "OFPET_HELLO_FAILED",
                    1: "OFPET_BAD_REQUEST",
@@ -144,7 +123,11 @@ class ofp_phy_port(Packet):
     fields_desc=[ ShortEnumField("port_no", 0, ofp_port),
                   MACField("hw_addr", 0),
                   StrFixedLenField("port_name", None, length=16),
- 
+                  #StrField("port_name", None, fmt="H", remain=24),
+                  #BitFieldLenField('port_name', None, 128, length_of='varfield'),
+
+                  #TODO: still some problem with this part
+                  #uint32_t for port config, for Openflow 1.0, this part only uses 7 bits.
                   BitField("not_defined", 0, 25),
                   BitField("OFPPC_NO_PACKET_IN", 0, 1),
                   BitField("OFPPC_NO_FWD", 0, 1),
@@ -152,7 +135,8 @@ class ofp_phy_port(Packet):
                   BitField("OFPPC_NO_RECV_STP",0, 1),
                   BitField("OFPPC_NO_RECV", 0, 1),
                   BitField("OFPPC_NO_STP", 0, 1),
-                  BitField("OFPPC_PORT_DOWN", 0, 1),        
+                  BitField("OFPPC_PORT_DOWN", 0, 1),
+                  
 
                   #uint32_t for state
                   BitField("else", 0, 31),
@@ -181,6 +165,97 @@ class ofp_phy_port(Packet):
 
                   #uint32_t for features advertised by peer
                   BitField("peer", 0, 32)]
+"""
+/* Extensions for circuit switch ports */ 
+uint16_t supp_sw_gran;             
+uint8_t     pad[2];                 
+unit8_t sup_sdh_port_bandwidth;    
+unit8_t sup_otn_port_bandwidth;    
+struct sup_wave_port_bandwidth wave_bw[0];    
+uint8_t     pad[2];                      
+uint16_t     peer_port_no;             /
+uint64_t     peer_datapath_id;         /
+}; 
+OFP_ASSERT(sizeof(struct ofp_phy_cport) == 72); 
+"""
+
+
+class ofp_phy_cport(Packet):
+    sw_grain = []
+    name = "OpenFlow Port"
+    fields_desc=[ ShortEnumField("port_no", 0, ofp_port),
+                  MACField("hw_addr", 0),
+                  StrFixedLenField("port_name", None, length=16), #OTN port name
+
+                  BitField("not_defined", 0, 25),
+                  BitField("OFPPC_NO_PACKET_IN", 0, 1),
+                  BitField("OFPPC_NO_FWD", 0, 1),
+                  BitField("OFPPC_NO_FLOOD", 0, 1),
+                  BitField("OFPPC_NO_RECV_STP",0, 1),
+                  BitField("OFPPC_NO_RECV", 0, 1),
+                  BitField("OFPPC_NO_STP", 0, 1),
+                  BitField("OFPPC_PORT_DOWN", 0, 1),
+                  
+                  #uint32_t for state
+                  BitField("else", 0, 31),
+                  BitField("OFPPS_LINK_DOWN", 0, 1),
+
+                  #uint32_t for Current features
+                  BitField("not_defined", 0, 32),
+                  
+                  #uint32_t for features being advised by the port
+                  BitField("advertised", 0, 32),
+
+                  #uint32_t for features supported by the port
+                  BitField("supported", 0, 32),
+
+                  #uint32_t for features advertised by peer
+                  BitField("peer", 0, 32),
+                  
+                  #uint16_t supp_swtype
+                  BitField("OFPST_FIBER", 0, 1),    # 1<<15 can switch circuits based on SM/MM fiber
+                  BitField("OFPST_WAVE", 0, 1),     # 1<<14 can switch circuits based on ITU-T lambdas
+                  BitField("OFPST_T_OTN", 0, 1),    # 1<<13 can switch circuits based on OTN standard
+                  BitField("OFPST_T_SDH", 0, 1),    # 1<<12 can switch circuits based on SDH standard
+                  BitField("OFPST_T_SONET", 0, 1),  # 1<<11 can switch circuits based on SONET standard
+                  BitField("NOT_DEFINED", 0, 6),    # Not used
+                  BitField("OFPST_ETH", 0, 1),      # 1<<4 can switch packets based on ETH headers
+                  BitField("OFPST_VLAN", 0, 1),     # 1<<3 can switch packets based on VLAN tags
+                  BitField("OFPST_MPLS", 0, 1),     # 1<<2 can switch packets based on MPLS labels
+                  BitField("OFPST_IP", 0, 1),       # 1<<1 can switch packets based on IP headers 
+                  BitField("OFPST_L4", 0, 1),       # 1<<0 can switch packets based on TCP/UDP headers
+                  
+                  #uint16_t supp_sw_gran
+                  BitField("SUPP_SW_GRAN", 0, 16),
+                  
+                  XByteField("pad1.1", 0),      #Padding to align to 64 bits
+                  XByteField("pad1.2", 0),      #Padding to align to 64 bits
+                  #TODO: not finished, 
+                  ]
+    # 
+    def show_sw_grain(self):
+        if not self.sw_grain == []:
+            print self.sw_grain
+        elif self.OFPST_T_OTN == 1:
+            val = self.SUPP_SW_GRAN
+            if val>= 1<<7: val = val%(1<<7)
+            if val>= 1<<6: val -= 1<<6; self.sw_grain.append("OFPTOG_ODUFLEX")
+            if val>= 1<<5: val -= 1<<5; self.sw_grain.append("OFPTOG_ODU5")
+            if val>= 1<<4: val -= 1<<4; self.sw_grain.append("OFPTOG_ODU4")
+            if val>= 1<<3: val -= 1<<3; self.sw_grain.append("OFPTOG_ODU3")
+            if val>= 1<<2: val -= 1<<2; self.sw_grain.append("OFPTOG_ODU2")
+            if val>= 1<<1: val -= 1<<1; self.sw_grain.append("OFPTOG_ODU1")
+            if val>= 1<<0: val -= 1<<0; self.sw_grain.append("OFPTOG_ODU0")
+            print self.sw_grain
+        elif self.OFPST_T_SDH == 1:
+            val = self.SUPP_SW_GRAN
+            if val>= 1<<5: val = val%(1<<5)
+            if val>= 1<<4: val -= 1<<4; self.sw_grain.append("OFPCBT_STM_256")
+            if val>= 1<<3: val -= 1<<3; self.sw_grain.append("OFPCBT_STM_64")
+            if val>= 1<<2: val -= 1<<2; self.sw_grain.append("OFPCBT_STM_16")
+            if val>= 1<<1: val -= 1<<1; self.sw_grain.append("OFPCBT_STM_4")
+            if val>= 1<<0: val -= 1<<0; self.sw_grain.append("OFPCBT_STM_1")
+            print self.sw_grain
 
 #should be a new field
 class ofp_flow_wildcards(Packet):
@@ -193,14 +268,14 @@ class ofp_flow_wildcards(Packet):
                   BitField("OFPFW_NW_DST_MASK", 0, 6), #((1<<6)-1)<<14
                   BitField("OFPFW_NW_SRC_MASK", 0, 6), #((1<<6)-1)<<8
 
-                  BitField("OFPFW_TP_DST", 0, 1),      #1<<7 TCP/UDP destination port
-                  BitField("OFPFW_TP_SRC", 0, 1),      #1<<6 TCP/UDP source port
-                  BitField("OFPFW_NW_PROTO", 0, 1),    #1<<5 IP protocol
-                  BitField("OFPFW_DL_TYPE", 0, 1),     #1<<4 Ethernet frame type
-                  BitField("OFPFW_DL_DST",0, 1),       #1<<3 Ethernet destination address
-                  BitField("OFPFW_DL_SRC", 0, 1),      #1<<2 Ethernet source address
-                  BitField("OFPFW_DL_VLAN", 0, 1),     #1<<1 VLAN id
-                  BitField("OFPFW_IN_PORT", 0, 1)      #1<<0 Switch input port
+                  BitField("OFPFW_TP_DST", 0, 1),   #1<<7 TCP/UDP destination port
+                  BitField("OFPFW_TP_SRC", 0, 1),   #1<<6 TCP/UDP source port
+                  BitField("OFPFW_NW_PROTO", 0, 1), #1<<5 IP protocol
+                  BitField("OFPFW_DL_TYPE", 0, 1),  #1<<4 Ethernet frame type
+                  BitField("OFPFW_DL_DST",0, 1),    #1<<3 Ethernet destination address
+                  BitField("OFPFW_DL_SRC", 0, 1),   #1<<2 Ethernet source address
+                  BitField("OFPFW_DL_VLAN", 0, 1),  #1<<1 VLAN id
+                  BitField("OFPFW_IN_PORT", 0, 1)   #1<<0 Switch input port
                 ]
 
 #the first of the match field is wildcards. I changed it into another
@@ -209,9 +284,9 @@ class ofp_match(Packet):
     name = "OpenFlow Match Field"
     fields_desc=[ #should be one wildcards field, defined in the previous class
                   ShortEnumField("in_port", 0, ofp_port),   #Input switch port
-                  MACField("dl_src", "00:00:00:00:00:00"),  #Ethernet source address
-                  MACField("dl_dst", "00:00:00:00:00:00"),  #Ethernet destination address
-                  ShortField("dl_vlan", 0xffff),            #input VLAN id
+                  MACField("dl_src", "00:00:00:00:00:00"),        #Ethernet source address
+                  MACField("dl_dst", "00:00:00:00:00:00"),        #Ethernet destination address
+                  ShortField("dl_vlan", 0xffff),     #input VLAN id
                   XByteField("dl_vlan_pcp", 0), #input VLAN priority
                   XByteField("pad1", 0),        #Padding to align to 64 bits
                   ShortField("dl_type", 0),     #Ethernet frame type
@@ -225,7 +300,20 @@ class ofp_match(Packet):
                   ShortField("tp_dst", 0),      #TCP/UDP destination port
                 ]
 
-
+class ofp_connection(Packet):
+    name = "OpenFlow Circuit Connection"
+    fields_desc=[ #first is the wildcards
+                  BitField("NOT_DEFINED", 0, 10),
+                  BitField("OFPCW_OUT_WPORT", 0, 1),    # 1<<5
+                  BitField("OFPCW_IN_WPORT", 0, 1),     # 1<<4
+                  BitField("OFPCW_OUT_TPORT", 0, 1),    # 1<<3
+                  BitField("OFPCW_IN_TPORT", 0, 1),     # 1<<2
+                  BitField("OFPCW_OUT_PORT", 0, 1),     # 1<<1
+                  BitField("OFPCW_IN_PORT", 0, 1),      # 1<<0
+                  ShortField("num_components", 0),      # Identifies number of cross-connects to be made - num array elems
+                  BitField("pad1.1", 0, 32),      #Padding to align to 64 bits
+                  #not done yet 
+                  ]
 
 
 ###################
@@ -280,7 +368,9 @@ class ofp_features_reply(Packet):
                   XByteField("n_tables", 0),
                   X3BytesField("pad", 0),
                   #features
-                  BitField("NOT DEFINED", 0, 24),
+                  BitField("OFPC_OTN_SWITCH", 0, 1),    #1<<31
+                  BitField("OFPC_WAVE_SWITCH", 0, 1),   #1<<30
+                  BitField("NOT_DEFINED", 0, 22),
                   BitField("OFPC_ARP_MATCH_IP", 0, 1),  #1<<7 Match IP address in ARP packets
                   BitField("OFPC_QUEUE_STATS", 0, 1),   #1<<6 Queue statistics
                   BitField("OFPC_IP_STREAM", 0, 1),     #1<<5 Can reassemble IP fragments
@@ -302,7 +392,6 @@ class ofp_packet_in(Packet):
                   ShortField("in_port", None),
                   ByteEnumField("reason", 0, ofp_packet_in_reason),
                   ByteField("pad", None)]
-
 # No. 12
 class ofp_port_status(Packet):
     name = "OpenFLow Port Status"
@@ -327,7 +416,6 @@ bind_layers( ofp_pktout_header, ofp_action_output, type=0)
 bind_layers( ofp_pktout_header, ofp_action_output, actions_len=8)
 
 # No. 14
-
 class ofp_flow_mod(Packet):
     name = "OpenFlow Flow Modify"
     fields_desc=[ BitField("cookie", 0, 64), #Opaque controller-issued identifier
@@ -344,6 +432,12 @@ class ofp_flow_mod(Packet):
                   ShortField("flags", 0)
                 ]
 
+# No. 0xff
+class ofp_cflow_mod(Packet):
+    name = "OpenFlow Circuit Flow Modify"
+    fields_desc=[ ShortEnumField("command", 0, ofp_flow_mod_command),
+                  ShortField("hard_timeout", 0),
+                  BitField("pad", 0, 32)] # append "ofp_connection" and "ofp_action_header" / "ofp_action"
 
 ####################
 # Useful Functions #
@@ -373,86 +467,15 @@ class ofp_flow_mod(Packet):
 20           "OFPT_QUEUE_GET_CONFIG_REQUEST",
 21           "OFPT_QUEUE_GET_CONFIG_REPLY"
 """
-
-
-def parse(unparsed):
-    if len(unparsed) < 8:
-        return ''  #indicating unparsed pkt is not of packet
-    else:
-        header = ofp_header(unparsed[:8]) #first 8 bytes are ofp_header, else are header.payload 
-        if header.type == 0:
-            print "OFPT_HELLO" # only 8 bytes
-            #return header
-        
-        elif header.type == 1:
-            print "OFPT_ERROR"
-            error = ofp_error_msg(unparsed[8:20])
-            #return header/error
-        
-        elif header.type == 2:
-            print "OFPT_ECHO_REQUEST"
-            #return header
-        
-        elif header.type == 3:
-            print "OFPT_ECHO_REPLY"
-            #return header
-        
-        elif header.type == 4:
-            print "OFPT_VENDOR"
-        
-        elif header.type == 5:
-            print "OFPT_FEATURES_REQUEST"
-        
-        elif header.type == 6:
-            print "OFPT_FEATURES_REPLY"
-        
-        elif header.type == 7:
-            print "OFPT_GET_CONFIG_REQUEST"
-        
-        elif header.type == 8:
-            print "OFPT_GET_CONFIG_REPLY"
-        
-        elif header.type == 9:
-            print "OFPT_SET_CONFIG"
-        
-        elif header.type == 10:
-            print "OFPT_PACKET_IN"
-        
-        elif header.type == 11:
-            print "OFPT_FLOW_REMOVED"
-        
-        elif header.type == 12:
-            print "OFPT_PORT_STATUS"
-        
-        elif header.type == 13:
-            print "OFPT_PACKET_OUT"
-        
-        elif header.type == 14:
-            print "OFPT_FLOW_MOD"
-        
-        elif header.type == 15:
-            print "OFPT_PORT_MOD"
-        
-        elif header.type == 16:
-            print "OFPT_STATS_REQUEST"
-        
-        elif header.type == 17:
-            print "OFPT_STATS_REPLY"
-        
-        elif header.type == 18:
-            print "OFPT_BARRIER_REQUEST"
-        
-        elif header.type == 19:
-            print "OFPT_BARRIER_REPLY"
-        
-        elif header.type == 20:
-            print "OFPT_QUEUE_GET_CONFIG_REQUEST"
-        
-        elif header.type == 21:
-            print "OFPT_QUEUE_GET_CONFIG_REPLY"
-    
     
 if __name__ == '__main__':
+    a = ofp_phy_cport()
+    a.OFPST_T_OTN = 1
+    a.SUPP_SW_GRAN = 129
+    print a.SUPP_SW_GRAN
+    a.show()
+    a.show_sw_grain()
+    """
     a = ofp_header()
     a.show()
     a.type = 3
@@ -485,3 +508,4 @@ if __name__ == '__main__':
     #loading scapy packet
     print "-----------------"
     Ether().show()
+    """
