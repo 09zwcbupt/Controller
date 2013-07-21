@@ -38,13 +38,9 @@ class switch(threading.Thread):
                 self.event.clear()
                 return
             #need something to ?
-            #print self.sock, self.sock.getsockname(), self.sock.getpeername()
+            print self.sock, self.sock.getsockname(), self.sock.getpeername()
             #try:
             data = self.sock.recv(1024)
-            print len(data), data
-            if len(data)>=8:
-                msg = of.ofp_header(data)
-                msg.show()
             #except 
             #data = ""
             if data == "":
@@ -84,7 +80,7 @@ def handle_server(fd, event):
         print "connection %s" % cli_addr[0],s, conn.fileno(), conn
         print conn.getsockname(), conn.getpeername()
         conn.setblocking(0)
-        #conn.send("123")
+        conn.send("123")
         conn_fd = conn.fileno()
         fd_map[conn_fd] = conn
         handle = partial(handle_pkt, conn)
