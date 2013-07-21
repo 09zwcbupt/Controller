@@ -5,20 +5,9 @@ from functools import partial
 from tornado.ioloop import IOLoop
 import threading
 
-sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-sock.setblocking(0)
-server_address = ("localhost", 6633)
-sock.bind(server_address)
-sock.listen(5)
-
 fd_map = {}              
 event_map = {}
 thread_map = {}
-
-fd = sock.fileno()
-fd_map[fd] = sock
-
-ioloop = IOLoop.instance()
 
 class switch(threading.Thread):
     def __init__(self, sock, event):
@@ -38,9 +27,16 @@ class switch(threading.Thread):
                 self.event.clear()
                 return
             #need something to ?
-            print self.sock, self.sock.getsockname(), self.sock.getpeername()
+            #print self.sock, self.sock.getsockname(), self.sock.getpeername()
             #try:
             data = self.sock.recv(1024)
+            print len(data), data
+            if len(data)>=8:
+                msg = of.ofp_header(data)
+                msg.show()
+                if msg.type == 0:
+                    print "OFP_HELLO"
+                    self.sock.send(data)
             #except 
             #data = ""
             if data == "":
@@ -73,30 +69,46 @@ def handle_pkt(cli_addr, fd, event):
         #del message_queue_map[s]
     
     
-def handle_server(fd, event):
+def handle_server(sock, fd, event):
     s = fd_map[fd]
-    if event & IOLoop.READ:
-        conn, cli_addr = s.accept()
-        print "connection %s" % cli_addr[0],s, conn.fileno(), conn
-        print conn.getsockname(), conn.getpeername()
-        conn.setblocking(0)
-        conn.send("123")
-        conn_fd = conn.fileno()
-        fd_map[conn_fd] = conn
-        handle = partial(handle_pkt, conn)
-        ioloop.add_handler(conn_fd, handle, IOLoop.READ)
-        event_map[conn] = threading.Event()
-        thread_map[conn_fd] = switch(conn, event_map[conn])
-        print thread_map
-        thread_map[conn_fd].start()
+    try:
+        conn, cli_addr = sock.accept()
+    except socket.error, e:
+        if e.args[0] not in (errno.EWOULDBLOCK, errno.EAGAIN):
+            raise
+        return
+    #if event & IOLoop.READ:    
+    print "connection %s" % cli_addr[0],s, conn.fileno(), conn
+    print conn.getsockname(), conn.getpeername()
+    conn.setblocking(0)
+    conn_fd = conn.fileno()
+    fd_map[conn_fd] = conn
+    handle = partial(handle_pkt, conn)
+    ioloop.add_handler(conn_fd, handle, IOLoop.READ)
+    event_map[conn] = threading.Event()
+    thread_map[conn_fd] = switch(conn, event_map[conn])
+    print thread_map
+    thread_map[conn_fd].start()
 
-ioloop.add_handler(fd, handle_server, IOLoop.READ)
-try:
-    ioloop.start()
-except KeyboardInterrupt:
-    print "quit"
-    for t in thread_map:
-        thread_map[t].stop()
-        thread_map[t].join
-    ioloop.stop()
-    sock.close()
+if __name__ == '__main__':
+    ioloop = IOLoop.instance()
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.setblocking(0)
+    server_address = ("localhost", 6633)
+    sock.bind(server_address)
+    sock.listen(5)
+    fd = sock.fileno()
+    fd_map[fd] = sock
+    
+    callback = partial(handle_pkt, sock)
+    ioloop.add_handler(sock.fileno(), callback, ioloop.READ)
+    #ioloop.add_handler(fd, handle_server, IOLoop.READ)
+    try:
+        ioloop.start()
+    except KeyboardInterrupt:
+        print "quit"
+        for t in thread_map:
+            thread_map[t].stop()
+            thread_map[t].join
+        ioloop.stop()
+        sock.close()
