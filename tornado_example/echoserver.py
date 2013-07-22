@@ -6,7 +6,7 @@ from tornado.ioloop import IOLoop
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.setblocking(0)
-server_address = ("localhost", 6633)
+server_address = ("localhost", 6733)
 sock.bind(server_address)
 sock.listen(5)
 
@@ -63,4 +63,4 @@ def handle_server(fd, event):
 
 
 ioloop.add_handler(fd, handle_server, IOLoop.READ)
-ioloop.staart()
+ioloop.start()
