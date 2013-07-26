@@ -118,6 +118,14 @@ ofp_port_mod_failed_code = { 0: "OFPPMFC_BAD_PORT",
 ofp_queue_op_failed_code = { 0: "OFPQOFC_BAD_PORT",
                              1: "OFPQOFC_BAD_QUEUE"}
 
+ofp_stats_types = { 0: "OFPST_DESC",
+                    1: "OFPST_FLOW",
+                    2: "OFPST_AGGREGATE",
+                    3: "OFPST_TABLE",
+                    4: "OFPST_PORT",
+                    5: "OFPST_QUEUE",
+                    0xffff: "OFPST_VENDOR"}
+
 class ofp_phy_port(Packet):
     name = "OpenFlow Port"
     fields_desc=[ ShortEnumField("port_no", 0, ofp_port),
@@ -431,6 +439,46 @@ class ofp_flow_mod(Packet):
                   #1<<2 bit is OFPFF_EMERG, used only switch disconnected with controller) 
                   ShortField("flags", 0)
                 ]
+    
+# No. 16
+#full message for flow status request: ofp_status_rqeuest()/ofp_flow_wildcards()/ofp_match()/ofp_flow_status_request()
+class ofp_stats_request(Packet):
+    name = "OpenFlow Stats Request"
+    fields_desc=[ ShortEnumField("type", 0, ofp_stats_types),
+                  ShortField("flag", 0)]#body follow this
+
+#body of ofp_status_request
+#need to add a match field before this pkt
+class ofp_flow_stats_request(Packet):
+    name = "OpenFlow Flow Stats Request"
+    fields_desc=[ BitField("table_id", 0xff, 8), #all flows by default
+                  BitField("pad", 0, 8),
+                  ShortField("out_port", 0xffff)] #no restriction by default, ofp_port.OFPP_NONE
+
+#reply from switch [actually same with ofp_stats_request] len = 4 bytes
+class ofp_stats_reply(Packet):
+    name = "OpenFlow Stats Reply"
+    fields_desc=[ ShortEnumField("type", 0, ofp_stats_types),
+                  ShortField("flag", 0)]
+
+#full message: ofp_flow_status()/ofp_flow_wildcards()/ofp_match()/ofp_status_data()/ofp_action_header()
+class ofp_flow_stats(Packet):
+    name = "OpenFlow Flow Stats"
+    fields_desc=[ ShortField("length", 0),
+                  BitField("table_id", 0, 8),
+                  BitField("pad", 0, 8)]# following match strcture
+    
+class ofp_flow_stats_data(Packet):
+    name = "OpenFlow Flow Stats Data"
+    fields_desc=[ IntField("duration_sec", 0),
+                  IntField("duration_nsec", 0),
+                  ShortField("priority", 0),
+                  ShortField("idle_timeout", 0),
+                  ShortField("hard_timeout", 0),
+                  BitField("pad", 0, 48),
+                  BitField("cookie", 0, 64),
+                  BitField("packet_count", 0, 64),
+                  BitField("byte_count", 0, 64)]# following ofp_action_header
 
 # No. 0xff
 class ofp_cflow_mod(Packet):
