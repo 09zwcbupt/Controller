@@ -252,8 +252,8 @@ class ofp_header(Packet):
 class ofp_action_header(Packet):
     name = "OpenFlow Action Header"
     fields_desc=[ ShortEnumField("type", 0, ofp_action_type),
-                  ShortField("len", 0), #length of this action (including this header)
-                  XByteField("pad", 0)]
+                  ShortField("len", 8), #length of this action (including this header)
+                  BitField("pad", 0, 32)]
 
 
 
@@ -333,6 +333,15 @@ class ofp_action_output(Packet):
                   ShortField("max_len", 0)]
 bind_layers( ofp_pktout_header, ofp_action_output, type=0)
 bind_layers( ofp_pktout_header, ofp_action_output, actions_len=8)
+
+# action_strip_vlan is just a action header, with type = 3
+
+class ofp_action_vlan_vid(Packet):
+    name = "OpenFlow Action Set VLAN VID"
+    fields_desc=[ ShortEnumField("type", 1, ofp_action_type),
+                 ShortField("len", 8),
+                 ShortField("vlan_vid", 0xffff),
+                 BitField("pad", 0, 16)]
 
 # No. 14
 

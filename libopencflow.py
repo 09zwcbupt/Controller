@@ -73,7 +73,7 @@ ofp_flow_mod_command = { 0: "OFPFC_ADD",            # New flow
                          2: "OFPFC_MODIFY_STRICT",  # Modify entry strictly matching wildcards
                          3: "OFPFC_DELETE",         # Delete all matching flows
                          4: "OFPFC_DELETE_STRICT",  # Strictly match wildcards and priority
-                         0xffff: "OFPFC_DROP"}      # Terminate a circuit flow
+                         0xffff: "OFPFC_DROP"}      # [added]Terminate a circuit flow
 
 ofp_error_type = { 0: "OFPET_HELLO_FAILED",
                    1: "OFPET_BAD_REQUEST",
@@ -480,6 +480,7 @@ class ofp_flow_stats_data(Packet):
                   BitField("packet_count", 0, 64),
                   BitField("byte_count", 0, 64)]# following ofp_action_header
 
+# ofp_header()/of.ofp_flow_wildcards()/of.ofp_match()/of.ofp_flow_mod()/
 # No. 0xff
 class ofp_cflow_mod(Packet):
     name = "OpenFlow Circuit Flow Modify"

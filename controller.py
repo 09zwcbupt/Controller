@@ -7,9 +7,10 @@ import libopenflow as of
 import Queue
 import time
 
+sock_dpid = {}
 fd_map = {}
 message_queue_map = {}
-pkt_out = of.ofp_header()/of.ofp_pktout_header()/of.ofp_action_output()
+pkt_out = of.ofp_header()/of.ofp_pktout_header()/of.ofp_action_vlan_vid()/of.ofp_action_output()
 global cookie
 global exe_id
 global ofp_match_obj
@@ -61,6 +62,7 @@ def client_handler(address, fd, events):
                 print "OFPT_FEATURES_REPLY"
                 #print "rmsg.load:",len(body)/48
                 msg = of.ofp_features_reply(body[0:24])#length of reply msg
+                sock_dpid[fd]=msg.datapath_id
                 #msg.show()
                 port_info_raw = body[24:]
                 port_info = {}
@@ -93,8 +95,8 @@ def client_handler(address, fd, events):
                     #stat_req.show()
                 
                 message_queue_map[sock].put(str(msg))
-                if exe_id>1:
-                    message_queue_map[sock].put(str(stat_req))
+                #if exe_id>1:
+                #    message_queue_map[sock].put(str(stat_req))
                 io_loop.update_handler(fd, io_loop.WRITE)
                 #end of test
                 
@@ -119,22 +121,85 @@ def client_handler(address, fd, events):
                 #pkt_in_msg.show()
                 raw = pkt_in_msg.load
                 pkt_parsed = of.Ether(raw)
-                #pkt_parsed.payload.show()
+                
+                #if sock_dpid[fd] == 2:
+                #    print isinstance(pkt_parsed.payload, of.IP)
+                #    pkt_parsed.payload.show()
+                
+                #pkt_parsed.show()
                 #print "to see if the payload of ether is IP"
                 #if isinstance(pkt_parsed.payload, of.IP):
                     #pkt_parsed.show()
                 if isinstance(pkt_parsed.payload, of.ARP):
                     #pkt_parsed.show()
                     #pkt_out = of.ofp_header()/of.ofp_pktout_header()/of.ofp_action_output()
-                    pkt_out.payload.payload.port = 0xfffb
-                    pkt_out.payload.buffer_id = pkt_in_msg.buffer_id
-                    pkt_out.payload.in_port = pkt_in_msg.in_port
-                    pkt_out.length = 24
+                    pkt_out_ = of.ofp_header()/of.ofp_pktout_header()/of.ofp_action_output()
+                    pkt_out_.payload.payload.port = 0xfffb
+                    pkt_out_.payload.buffer_id = pkt_in_msg.buffer_id
+                    pkt_out_.payload.in_port = pkt_in_msg.in_port
+                    pkt_out_.payload.actions_len = 8
+                    pkt_out_.length = 24
                     #pkt_out.show()
                     io_loop.update_handler(fd, io_loop.WRITE)
-                    message_queue_map[sock].put(str(pkt_out))
-                if isinstance(pkt_parsed.payload, of.IP):
-                    if isinstance(pkt_parsed.payload.payload, of.ICMP):
+                    message_queue_map[sock].put(str(pkt_out_))
+                if isinstance(pkt_parsed.payload, of.IP) or isinstance(pkt_parsed.payload.payload, of.IP):
+                    #print isinstance(pkt_parsed.payload, of.Dot1Q)
+                    #print pkt_parsed.payload.vlan
+                    global cookie
+                    global exe_id    
+                    
+                    if isinstance(pkt_parsed.payload.payload.payload, of.ICMP):
+                        exe_id += 1
+                        cookie += 1
+                        
+                        # when the wildcards bit is set (to 1), the field is not matched
+                        flow_mod_msg = of.ofp_header(type=14,
+                                                     length=88,
+                                                     xid=exe_id)\
+                                       /of.ofp_flow_wildcards(OFPFW_NW_TOS=1,
+                                                              OFPFW_DL_VLAN_PCP=1,
+                                                              OFPFW_NW_DST_MASK=1,
+                                                              OFPFW_NW_SRC_MASK=1,
+                                                              OFPFW_TP_DST=1,
+                                                              OFPFW_TP_SRC=1,
+                                                              OFPFW_NW_PROTO=1,
+                                                              OFPFW_DL_TYPE=1,
+                                                              OFPFW_DL_VLAN=0,
+                                                              OFPFW_IN_PORT=0,
+                                                              OFPFW_DL_DST=0,
+                                                              OFPFW_DL_SRC=0)\
+                                       /of.ofp_match(in_port=pkt_in_msg.in_port,
+                                                     dl_src=pkt_parsed.src,
+                                                     dl_dst=pkt_parsed.dst,
+                                                     dl_type=pkt_parsed.type,
+                                                     dl_vlan=pkt_parsed.payload.vlan,
+                                                     nw_tos=pkt_parsed.payload.tos,
+                                                     nw_proto=pkt_parsed.payload.proto,
+                                                     nw_src=pkt_parsed.payload.src,
+                                                     nw_dst=pkt_parsed.payload.dst,
+                                                     tp_src = pkt_parsed.payload.payload.type,
+                                                     tp_dst = pkt_parsed.payload.payload.code)\
+                                       /of.ofp_flow_mod(cookie=cookie,
+                                                        command=0,
+                                                        idle_timeout=0,
+                                                        hard_timeout=60,
+                                                        buffer_id=pkt_in_msg.buffer_id,#icmp type 8: request, 0: reply
+                                                        flags=1)
+                        #! The match field is not right!
+                        if (not isinstance(pkt_parsed.payload, of.IP)) and pkt_parsed.payload.src =="10.0.0.1" and sock_dpid[fd] == 2: # have VLAN and from node 2 -> 1 @s2 (rm vlan)
+                            print "1->2 @s2"
+                            flow_mod_msg = flow_mod_msg/of.ofp_action_header(type=3)/of.ofp_action_output(type=0, port=0xfffb, len=8)
+                        
+                        elif (not isinstance(pkt_parsed.payload, of.IP)) and pkt_parsed.payload.src =="10.0.0.2" and sock_dpid[fd] == 1: # have VLAN and from node 2 -> 1 (rm vlan)
+                            print "1<-2 @s1"
+                            flow_mod_msg = flow_mod_msg/of.ofp_action_header(type=3)/of.ofp_action_output(type=0, port=0xfffb, len=8)
+                        
+                        io_loop.update_handler(fd, io_loop.WRITE)
+                        #message_queue_map[sock].put(str(pkt_out))
+                        message_queue_map[sock].put(str(flow_mod_msg))
+                        message_queue_map[sock].put(str(of.ofp_header(type=18,xid=exe_id))) #send a barrier request msg.
+
+                    elif isinstance(pkt_parsed.payload.payload, of.ICMP):
                         #print "from", pkt_parsed.src, "to", pkt_parsed.dst 
                         
                         """
@@ -146,10 +211,13 @@ def client_handler(address, fd, events):
                         
                         #pkt_parsed.show()
                         #pkt_out = of.ofp_header()/of.ofp_pktout_header()/of.ofp_action_output()
-                        pkt_out.payload.payload.port = 0xfffb
+                        """pkt_out.payload.payload.vlan_vid = 100
+                        pkt_out.payload.payload.payload.port = 0xfffb
                         pkt_out.payload.buffer_id = pkt_in_msg.buffer_id
                         pkt_out.payload.in_port = pkt_in_msg.in_port
-                        pkt_out.length = 24
+                        pkt_out.payload.actions_len = 16
+                        pkt_out.length = 32#24 with out vlan mod
+                        pkt_out.show()"""
                         
                         """
                         io_loop.update_handler(fd, io_loop.WRITE)
@@ -162,11 +230,10 @@ def client_handler(address, fd, events):
                         #pkt_out.show()
                         #usually don't have to fill in ``wilecards`` area
                         
-                        global cookie
-                        global exe_id
                         exe_id += 1
                         cookie += 1
-                        flow_mod_msg = of.ofp_header(type=14,
+                        
+                        """flow_mod_msg = of.ofp_header(type=14,
                                                      length=80,
                                                      xid=exe_id)/\
                         of.ofp_flow_wildcards()\
@@ -187,10 +254,48 @@ def client_handler(address, fd, events):
                                          flags=1)\
                         /of.ofp_action_output(type=0, 
                                               port=0xfffb,
-                                              len=8)
+                                              len=8)"""
+                                              
+                        flow_mod_msg = of.ofp_header(type=14,
+                                                     length=88,
+                                                     xid=exe_id)\
+                                       /of.ofp_flow_wildcards()\
+                                       /of.ofp_match(in_port=pkt_in_msg.in_port,
+                                                     dl_src=pkt_parsed.src,
+                                                     dl_dst=pkt_parsed.dst,
+                                                     dl_type=pkt_parsed.type,
+                                                     nw_tos=pkt_parsed.payload.tos,
+                                                     nw_proto=pkt_parsed.payload.proto,
+                                                     nw_src=pkt_parsed.payload.src,
+                                                     nw_dst=pkt_parsed.payload.dst,
+                                                     tp_src = pkt_parsed.payload.payload.type,
+                                                     tp_dst = pkt_parsed.payload.payload.code)\
+                                       /of.ofp_flow_mod(cookie=cookie,
+                                                        command=0,
+                                                        idle_timeout=0,
+                                                        hard_timeout=60,
+                                                        buffer_id=pkt_in_msg.buffer_id,#icmp type 8: request, 0: reply
+                                                        flags=1)
+                        
+                        # h1 -> (add vlan)of_switch(rm vlan) -> h2
+                        if isinstance(pkt_parsed.payload, of.IP) and pkt_parsed.payload.src == "10.0.0.1" and sock_dpid[fd] == 1: # not VLAN and from node 1 -> 2 @s1(add vlan)
+                            print "1->2 @s1"
+                            flow_mod_msg = flow_mod_msg/of.ofp_action_vlan_vid(vlan_vid = 100)/of.ofp_action_output(type=0, port=0xfffb, len=8)                            
+                        # second part in previous section(with 802.1q header)
+                        #elif (not isinstance(pkt_parsed.payload, of.IP)) and pkt_parsed.payload.src =="10.0.0.1" and sock_dpid[fd] == 2: # have VLAN and from node 2 -> 1 @s2 (rm vlan)
+                        #    print "1->2 @s2"
+                        #    flow_mod_msg = flow_mod_msg/of.ofp_action_header(type=3)/of.ofp_action_output(type=0, port=0xfffb, len=8)
+                       
+                        # h1 <- (rm vlan)of_switch(add vlan) <- h2
+                        elif isinstance(pkt_parsed.payload, of.IP) and pkt_parsed.payload.src == "10.0.0.2" and sock_dpid[fd] == 2: # not VLAN and from node 1 -> 2 @s2(add vlan)
+                            print "1<-2 @s2"
+                            flow_mod_msg = flow_mod_msg/of.ofp_action_vlan_vid(vlan_vid = 200)/of.ofp_action_output(type=0, port=0xfffb, len=8)
+                        #elif (not isinstance(pkt_parsed.payload, of.IP)) and pkt_parsed.payload.src =="10.0.0.2" and sock_dpid[fd] == 1: # have VLAN and from node 2 -> 1 (rm vlan)
+                        #    print "1<-2 @s1"
+                        #    flow_mod_msg = flow_mod_msg/of.ofp_action_output(type=0, port=0xfffb, len=8)/of.ofp_action_header(type=3)
                         
                         #flow_mod_msg.show()
-                        global ofp_match_obj
+                        """global ofp_match_obj
                         ofp_match_obj = of.ofp_match(in_port=pkt_in_msg.in_port,
                                       dl_src=pkt_parsed.src,
                                       dl_dst=pkt_parsed.dst,
@@ -200,9 +305,8 @@ def client_handler(address, fd, events):
                                       nw_src=pkt_parsed.payload.src,
                                       nw_dst=pkt_parsed.payload.dst,
                                       tp_src = pkt_parsed.payload.payload.type,
-                                      tp_dst = pkt_parsed.payload.payload.code)
+                                      tp_dst = pkt_parsed.payload.payload.code)"""
                         
-                        exe_id += 1
                         """
                         
                         print "--------------------------------------------------------------------------------------"
