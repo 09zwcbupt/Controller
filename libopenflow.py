@@ -310,12 +310,14 @@ class ofp_packet_in(Packet):
                   ShortField("in_port", None),
                   ByteEnumField("reason", 0, ofp_packet_in_reason),
                   ByteField("pad", None)]
+bind_layers( ofp_header, ofp_packet_in, type=10 )
 
 # No. 12
 class ofp_port_status(Packet):
     name = "OpenFLow Port Status"
     fields_desc=[ ByteEnumField("reason", 0, ofp_port_reason),
                   BitField("pad", 0, 56)]
+bind_layers( ofp_header, ofp_port_status, type=12 )
 
 # No. 13 
 class ofp_pktout_header(Packet):
@@ -358,8 +360,8 @@ class ofp_flow_mod(Packet):
                   #flags are important, the 1<<0 bit is OFPFF_SEND_FLOW_REM, send OFPT_FLOW_REMOVED
                   #1<<1 bit is OFPFF_CHECK_OVERLAP, checking if the entries' field overlaps(among same priority)  
                   #1<<2 bit is OFPFF_EMERG, used only switch disconnected with controller) 
-                  ShortField("flags", 0)
-                ]
+                  ShortField("flags", 0)]
+bind_layers( ofp_header, ofp_flow_mod, type=14 )
     
 # No. 16
 #full message for flow status request: ofp_status_rqeuest()/ofp_flow_wildcards()/ofp_match()/ofp_flow_status_request()

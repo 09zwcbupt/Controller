@@ -308,22 +308,6 @@ class ofp_match(Packet):
                   ShortField("tp_dst", 0),      #TCP/UDP destination port
                 ]
 
-class ofp_connection(Packet):
-    name = "OpenFlow Circuit Connection"
-    fields_desc=[ #first is the wildcards
-                  BitField("NOT_DEFINED", 0, 10),
-                  BitField("OFPCW_OUT_WPORT", 0, 1),    # 1<<5
-                  BitField("OFPCW_IN_WPORT", 0, 1),     # 1<<4
-                  BitField("OFPCW_OUT_TPORT", 0, 1),    # 1<<3
-                  BitField("OFPCW_IN_TPORT", 0, 1),     # 1<<2
-                  BitField("OFPCW_OUT_PORT", 0, 1),     # 1<<1
-                  BitField("OFPCW_IN_PORT", 0, 1),      # 1<<0
-                  ShortField("num_components", 0),      # Identifies number of cross-connects to be made - num array elems
-                  BitField("pad1.1", 0, 32),      #Padding to align to 64 bits
-                  #not done yet 
-                  ]
-
-
 ###################
 # OpenFlow Header #
 ###################
@@ -480,13 +464,74 @@ class ofp_flow_stats_data(Packet):
                   BitField("packet_count", 0, 64),
                   BitField("byte_count", 0, 64)]# following ofp_action_header
 
-# ofp_header()/of.ofp_flow_wildcards()/of.ofp_match()/of.ofp_flow_mod()/
+# of.ofp_header()/of.ofp_cflow_mod()/of.ofp_flow_wildcards()/of.ofp_match()/ofp_connect()/of.ofp_action_output()...
 # No. 0xff
 class ofp_cflow_mod(Packet):
     name = "OpenFlow Circuit Flow Modify"
     fields_desc=[ ShortEnumField("command", 0, ofp_flow_mod_command),
                   ShortField("hard_timeout", 0),
                   BitField("pad", 0, 32)] # append "ofp_connection" and "ofp_action_header" / "ofp_action"
+
+bind_layers( ofp_header, ofp_cflow_mod, type = 0xff)
+
+class ofp_connect_wildcards(Packet):
+    name = "OpenFlow Connect Wildcards"
+    fields_desc=[ BitField("not_defined", 0, 10),
+                  BitField("OFPCW_OUT_WPORT", 0, 1),# 1 << 5
+                  BitField("OFPCW_IN_WPORT", 0, 1), # 1 << 4
+                  BitField("OFPCW_OUT_TPORT", 0, 1),# 1 << 3
+                  BitField("OFPCW_IN_TPORT", 0, 1), # 1 << 2
+                  BitField("OFPCW_OUT_PORT", 0, 1), # 1 << 1
+                  BitField("OFPCW_IN_PORT", 0, 1),] # 1 << 0
+
+bind_layers( ofp_cflow_mod, ofp_connect_wildcards)
+
+# need of.ofp_flow_wildcards()/of.ofp_match() before this strcture
+class ofp_connect(Packet):
+    name = "OpenFlow Circuit Connection"
+    fields_desc=[ ShortField("num_components", 0),
+                  BitField("pad", 0, 32),
+                  ShortEnumField("in_port", 0, ofp_port),
+                  ShortEnumField("out_port", 0, ofp_port),
+                  #------------------------------------------
+                  #ofp_tdm_port in_tport
+                  ShortEnumField("tport_in", 0, ofp_port),  
+                  ShortField("tstart_in", 0),
+                  IntField("tsignal_in", 0),
+                  
+                  #ofp_tdm_port out_tport
+                  ShortEnumField("tport_out", 0, ofp_port),
+                  ShortField("tstart_out", 0),
+                  IntField("tsignal_out", 0),
+                  #------------------------------------------
+                  #ofp_otn_port in_nport
+                  ShortEnumField("nport_in", 0, ofp_port),  # physical port of in-coming packet
+                  ShortField("supp_sw_otn_gran_in", 0),     # ODU of in-coming port 
+                  BitField("sup_otn_port_bandwidth_in", 0, 8), 
+                  BitField("pad", 0, 8),
+                  BitField("bitmap_in", 0, 80),
+
+                  #ofp_otn_port out_nport
+                  ShortEnumField("nport_out", 0, ofp_port), # physical port of out-coming packet
+                  ShortField("supp_sw_otn_gran_out", 0),    # ODU of out-coming port
+                  BitField("sup_otn_port_bandwidth_out", 0, 8),
+                  BitField("pad", 0, 8),
+                  BitField("bitmap_out", 0, 80),
+                  #------------------------------------------
+                  #ofp_wave_port in_wport
+                  ShortEnumField("wport_in", 0, ofp_port),  # physical port of in-coming packet 
+                  IntField("center_freq_lmda_in", 0),
+                  BitField("num_wave_in", 0, 8),            # lambda of in-coming port
+                  BitField("flag_in", 0, 8),
+                  
+                  #ofp_wave_port out_wport
+                  ShortEnumField("wport_out", 0, ofp_port), # physical port of out-coming packet
+                  IntField("center_freq_lmda_out", 0),
+                  BitField("num_wave_out", 0, 8),           # lambda of out-coming port
+                  BitField("flag_out", 0, 8)
+                  ]
+    
+bind_layers( ofp_connect_wildcards, ofp_connect)
 
 ####################
 # Useful Functions #
@@ -524,6 +569,22 @@ if __name__ == '__main__':
     print a.SUPP_SW_GRAN
     a.show()
     a.show_sw_grain()
+    
+    #           8            8                     2                74
+    cmod = ofp_header()/ofp_cflow_mod()/ofp_connect_wildcards()/ofp_connect()
+    cmod.show()
+    print "len of header:", len(str(ofp_header()))
+    print "len of cflmod:", len(str(ofp_cflow_mod()))
+    print "len of connwc:", len(str(ofp_connect_wildcards()))
+    print "len of conect:", len(str(ofp_connect()))
+    print "total len:", len(str(cmod))
+    #print isinstance(cmod, ofp_header)
+    string = str(cmod)
+    print string, len(string)
+    pars = ofp_header(string)
+    pars.show()
+    
+    import convert
     """
     a = ofp_header()
     a.show()
