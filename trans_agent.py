@@ -7,6 +7,8 @@ import functools
 import tornado.ioloop as ioloop
 import socket
 import libopenflow as of
+import libopencflow as ofc
+import convert
 
 import Queue
 
@@ -47,6 +49,7 @@ class switch():
         self.queue_sw   = Queue.Queue()
         self.buffer     = {}
         self.counter    = 0
+        self.dpid       = 0
         
     def controller_handler(self, address, fd, events):
         if events & io_loop.READ:
@@ -62,14 +65,18 @@ class switch():
                 # Here, we can manipulate OpenFlow packets from CONTROLLER.
                 #rmsg.show()
                 if rmsg.type == 14:
-                    #print "packet out/flow mod"
-                    header = of.ofp_header(data[0:8])
-                    wildcards = of.ofp_flow_wildcards(data[8:12])
-                    match = of.ofp_match(data[12:48])
-                    flow_mod = of.ofp_flow_mod(data[48:])
-                    print "flow_mod_msg xid:", header.xid, flow_mod.buffer_id
-                    #print flow_mod.buffer_id, flow_mod.buffer_id == self.buffer[match.in_port]
-                
+                    
+                    header = ofc.ofp_header(data[0:8])
+                    print "ofc_xid = ", header.xid
+                    cflow_mod = ofc.ofp_cflow_mod(data[8:16])
+                    cflow_connect_wildcards = ofc.ofp_connect_wildcards(data[16:18])
+                    cflow_connect = ofc.ofp_connect(data[18:92])
+                    actions = data[92:]
+                    msg = header/cflow_mod/cflow_connect_wildcards/cflow_connect
+                    data = convert.ofc2of(msg, self.buffer, self.dpid)
+                    print "flow_mod_msg xid:", header.xid
+                    #data.show()
+                    
                 io_loop.update_handler(self.fd_sw, io_loop.WRITE)
                 self.queue_sw.put(str(data))
     
@@ -96,7 +103,12 @@ class switch():
             else:
                 rmsg = of.ofp_header(data[0:8])
                 #rmsg.show()
-                if rmsg.type == 10:
+                if rmsg.type == 6:
+                    print "OFPT_FEATURES_REPLY"
+                    #print "rmsg.load:",len(body)/48
+                    msg = of.ofp_features_reply(data[8:32])#length of reply msg
+                    self.dpid=msg.datapath_id
+                elif rmsg.type == 10:
                     #print "Packet In"
                     pkt_in_msg = of.ofp_packet_in(data[8:18])
                     #pkt_in_msg.show()
@@ -106,16 +118,16 @@ class switch():
                     self.counter+=1
                     if isinstance(pkt_parsed.payload, of.IP) or isinstance(pkt_parsed.payload.payload, of.IP):
                         if isinstance(pkt_parsed.payload.payload, of.ICMP):
-                            self.buffer[(pkt_in_msg.in_port, id)] = [pkt_in_msg.buffer_id, rmsg/pkt_in_msg/pkt_parsed] # bind buffer id with in port 
+                            self.buffer[(pkt_in_msg.in_port, self.counter)] = [pkt_in_msg.buffer_id, rmsg/pkt_in_msg/pkt_parsed] # bind buffer id with in port 
                             #print "ping", self.buffer  
                         elif isinstance(pkt_parsed.payload.payload.payload, of.ICMP):
-                            self.buffer[(pkt_in_msg.in_port, id)] = [pkt_in_msg.buffer_id, rmsg/pkt_in_msg/pkt_parsed] # bind buffer id with in port 
+                            self.buffer[(pkt_in_msg.in_port, self.counter)] = [pkt_in_msg.buffer_id, rmsg/pkt_in_msg/pkt_parsed] # bind buffer id with in port 
                             #print "ping", self.buffer
                             
                     #change the xid in header, so that the agent can track the packet/buffer_id more precisely
                     rmsg.xid = self.counter
                     data = rmsg/pkt_in_msg/pkt_parsed
-                    print "pkt_in_msg xid:", self.counter, pkt_in_msg.buffer_id
+                    #print "pkt_in_msg xid:", self.counter, pkt_in_msg.buffer_id
                     #rmsg.show()
                 # Here, we can manipulate OpenFlow packets from SWITCH.
                 io_loop.update_handler(self.fd_con, io_loop.WRITE)
@@ -160,7 +172,7 @@ def agent(sock, fd, events):
     #no idea why, but when not blocking, it says: error: [Errno 36] Operation now in progress
     sock_control = new_sock(1)
     try:
-        sock_control.connect(("10.2.31.80",6633))#controller's IP, better change it into an argument
+        sock_control.connect(("localhost",6634))#controller's IP, better change it into an argument
     except socket.error, e:
         if e.args[0] not in (errno.ECONNREFUSED, errno.EINPROGRESS):
             raise

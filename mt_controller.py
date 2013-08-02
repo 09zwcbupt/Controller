@@ -38,10 +38,8 @@ class switch(threading.Thread):
                 print "receive quit signal"
                 self.event.clear()
                 return
-            #need something to ?
-            #print self.sock, self.sock.getsockname(), self.sock.getpeername()
             data = self.receive()
-                #print 'sending "%s" to %s' % (of.ofp_header(next_msg).type, address)
+            #print 'sending "%s" to %s' % (of.ofp_header(next_msg).type, address)
             #data = self.receive()
             #print len(data), data
             if len(data)>=8:
@@ -63,7 +61,7 @@ class switch(threading.Thread):
                     self.send(str(msg))
                 elif msg.type == 10:
                     #print "OFPT_PACKET_IN"
-                    #rmsg.show()
+                    msg.show()
                     pkt_in_msg = of.ofp_packet_in(body)
                     #pkt_in_msg.show()
                     raw = pkt_in_msg.load

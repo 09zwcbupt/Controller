@@ -119,9 +119,9 @@ def client_handler(address, fd, events):
                 #print "OFPT_PACKET_IN"
                 #rmsg.show()
                 pkt_in_msg = of.ofp_packet_in(body)
-                #pkt_in_msg.show()
                 raw = pkt_in_msg.load
                 pkt_parsed = of.Ether(raw)
+                
                 
                 #if sock_dpid[fd] == 2:
                 #    print isinstance(pkt_parsed.payload, of.IP)
@@ -150,6 +150,10 @@ def client_handler(address, fd, events):
                     global exe_id    
                     
                     if isinstance(pkt_parsed.payload.payload.payload, of.ICMP):
+                        #print "dpid:", sock_dpid[fd]
+                        rmsg.show()
+                        pkt_in_msg.show()
+                        pkt_parsed.show()
                         exe_id += 1
                         cookie += 1
                         
@@ -195,12 +199,17 @@ def client_handler(address, fd, events):
                             print "1<-2 @s1"
                             flow_mod_msg = flow_mod_msg/of.ofp_action_header(type=3)/of.ofp_action_output(type=0, port=0xfffb, len=8)
                         
+                        #flow_mod_msg.show()
                         io_loop.update_handler(fd, io_loop.WRITE)
                         #message_queue_map[sock].put(str(pkt_out))
                         message_queue_map[sock].put(str(flow_mod_msg))
                         message_queue_map[sock].put(str(of.ofp_header(type=18,xid=exe_id))) #send a barrier request msg.
 
                     elif isinstance(pkt_parsed.payload.payload, of.ICMP):
+                        #print "dpid:", sock_dpid[fd]
+                        #pkt_in_msg.show()
+                        #pkt_parsed.show()
+                        
                         #print "from", pkt_parsed.src, "to", pkt_parsed.dst 
                         
                         """
@@ -413,8 +422,8 @@ def new_sock(block):
 
 if __name__ == '__main__':
     sock = new_sock(0)
-    sock.bind(("", 6633))
-    sock.listen(6633)
+    sock.bind(("", 6634))
+    sock.listen(6634)
     
     io_loop = ioloop.IOLoop.instance()
     #callback = functools.partial(connection_ready, sock)
