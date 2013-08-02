@@ -46,6 +46,7 @@ class switch():
         self.queue_con  = Queue.Queue()
         self.queue_sw   = Queue.Queue()
         self.buffer     = {}
+        self.counter    = 0
         
     def controller_handler(self, address, fd, events):
         if events & io_loop.READ:
@@ -66,6 +67,7 @@ class switch():
                     wildcards = of.ofp_flow_wildcards(data[8:12])
                     match = of.ofp_match(data[12:48])
                     flow_mod = of.ofp_flow_mod(data[48:])
+                    print "flow_mod_msg xid:", header.xid, flow_mod.buffer_id
                     #print flow_mod.buffer_id, flow_mod.buffer_id == self.buffer[match.in_port]
                 
                 io_loop.update_handler(self.fd_sw, io_loop.WRITE)
@@ -92,7 +94,7 @@ class switch():
                 self.sock_con.close()
                 io_loop.remove_handler(self.fd_con)
             else:
-                rmsg = of.ofp_header(data)
+                rmsg = of.ofp_header(data[0:8])
                 #rmsg.show()
                 if rmsg.type == 10:
                     #print "Packet In"
@@ -100,14 +102,21 @@ class switch():
                     #pkt_in_msg.show()
                     pkt_parsed = of.Ether(data[18:])
                     #pkt_parsed.show()
+                    #[port + id] --> [buffer_id + pkt_in_msg]
+                    self.counter+=1
                     if isinstance(pkt_parsed.payload, of.IP) or isinstance(pkt_parsed.payload.payload, of.IP):
                         if isinstance(pkt_parsed.payload.payload, of.ICMP):
-                            self.buffer[pkt_in_msg.in_port] = pkt_in_msg.buffer_id # bind buffer id with in port 
+                            self.buffer[(pkt_in_msg.in_port, id)] = [pkt_in_msg.buffer_id, rmsg/pkt_in_msg/pkt_parsed] # bind buffer id with in port 
                             #print "ping", self.buffer  
                         elif isinstance(pkt_parsed.payload.payload.payload, of.ICMP):
-                            self.buffer[pkt_in_msg.in_port] = pkt_in_msg.buffer_id # bind buffer id with in port 
+                            self.buffer[(pkt_in_msg.in_port, id)] = [pkt_in_msg.buffer_id, rmsg/pkt_in_msg/pkt_parsed] # bind buffer id with in port 
                             #print "ping", self.buffer
-                    
+                            
+                    #change the xid in header, so that the agent can track the packet/buffer_id more precisely
+                    rmsg.xid = self.counter
+                    data = rmsg/pkt_in_msg/pkt_parsed
+                    print "pkt_in_msg xid:", self.counter, pkt_in_msg.buffer_id
+                    #rmsg.show()
                 # Here, we can manipulate OpenFlow packets from SWITCH.
                 io_loop.update_handler(self.fd_con, io_loop.WRITE)
                 self.queue_con.put(str(data))
