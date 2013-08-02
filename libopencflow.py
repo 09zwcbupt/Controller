@@ -407,6 +407,16 @@ class ofp_action_output(Packet):
 bind_layers( ofp_pktout_header, ofp_action_output, type=0)
 bind_layers( ofp_pktout_header, ofp_action_output, actions_len=8)
 
+# action_strip_vlan is just a action header, with type = 3
+
+class ofp_action_vlan_vid(Packet):
+    name = "OpenFlow Action Set VLAN VID"
+    fields_desc=[ ShortEnumField("type", 1, ofp_action_type),
+                 ShortField("len", 8),
+                 ShortField("vlan_vid", 0xffff),
+                 BitField("pad", 0, 16)]
+
+
 # No. 14
 class ofp_flow_mod(Packet):
     name = "OpenFlow Flow Modify"

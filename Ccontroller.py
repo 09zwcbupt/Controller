@@ -18,6 +18,16 @@ cookie = 0
 exe_id = 0
 ofp_match_obj = of.ofp_match()
 
+# dpid->type
+switch_info = {1:"otn", 2:"otn", 3:"wave"} # 1 otn; 2 otn->wave; 3 wave
+
+# port->grain+slot(otn)/wave length(wave)
+host_info = {
+                "otn":{1:("odu0",64), 2:("odu1",22), 3:("odu2",6)},
+                "wave":lambda x:96-x
+            }
+                
+
 def handle_connection(connection, address):
         print "1 connection,", connection, address
 
@@ -119,18 +129,9 @@ def client_handler(address, fd, events):
                 #print "OFPT_PACKET_IN"
                 #rmsg.show()
                 pkt_in_msg = of.ofp_packet_in(body)
-                #pkt_in_msg.show()
                 raw = pkt_in_msg.load
                 pkt_parsed = of.Ether(raw)
                 
-                #if sock_dpid[fd] == 2:
-                #    print isinstance(pkt_parsed.payload, of.IP)
-                #    pkt_parsed.payload.show()
-                
-                #pkt_parsed.show()
-                #print "to see if the payload of ether is IP"
-                #if isinstance(pkt_parsed.payload, of.IP):
-                    #pkt_parsed.show()
                 if isinstance(pkt_parsed.payload, of.ARP):
                     #pkt_parsed.show()
                     #pkt_out = of.ofp_header()/of.ofp_pktout_header()/of.ofp_action_output()
@@ -150,6 +151,10 @@ def client_handler(address, fd, events):
                     global exe_id    
                     
                     if isinstance(pkt_parsed.payload.payload.payload, of.ICMP):
+                        #print "dpid:", sock_dpid[fd]
+                        rmsg.show()
+                        pkt_in_msg.show()
+                        pkt_parsed.show()
                         exe_id += 1
                         cookie += 1
                         
@@ -195,67 +200,16 @@ def client_handler(address, fd, events):
                             print "1<-2 @s1"
                             flow_mod_msg = flow_mod_msg/of.ofp_action_header(type=3)/of.ofp_action_output(type=0, port=0xfffb, len=8)
                         
+                        #flow_mod_msg.show()
                         io_loop.update_handler(fd, io_loop.WRITE)
                         #message_queue_map[sock].put(str(pkt_out))
                         message_queue_map[sock].put(str(flow_mod_msg))
                         message_queue_map[sock].put(str(of.ofp_header(type=18,xid=exe_id))) #send a barrier request msg.
 
                     elif isinstance(pkt_parsed.payload.payload, of.ICMP):
-                        #print "from", pkt_parsed.src, "to", pkt_parsed.dst 
-                        
-                        """
-                        When receive a OPF_PACKET_IN message, you can caculate a path, and then
-                        use OFP_FLOW_MOD message to install path. Also, you can find out the exact
-                        port to send the message, then you can use the following code to send a
-                        OFP_PACKET_OUT message and send the packet to destination.
-                        """
-                        
-                        #pkt_parsed.show()
-                        #pkt_out = of.ofp_header()/of.ofp_pktout_header()/of.ofp_action_output()
-                        """pkt_out.payload.payload.vlan_vid = 100
-                        pkt_out.payload.payload.payload.port = 0xfffb
-                        pkt_out.payload.buffer_id = pkt_in_msg.buffer_id
-                        pkt_out.payload.in_port = pkt_in_msg.in_port
-                        pkt_out.payload.actions_len = 16
-                        pkt_out.length = 32#24 with out vlan mod
-                        pkt_out.show()"""
-                        
-                        """
-                        io_loop.update_handler(fd, io_loop.WRITE)
-                        message_queue_map[sock].put(str(pkt_out))
-                        """
-                        
-                        #print pkt_parsed.payload.proto
-                        #pkt_parsed.show()
-                        #print "ICMP protocol"
-                        #pkt_out.show()
-                        #usually don't have to fill in ``wilecards`` area
-                        
+
                         exe_id += 1
                         cookie += 1
-                        
-                        """flow_mod_msg = of.ofp_header(type=14,
-                                                     length=80,
-                                                     xid=exe_id)/\
-                        of.ofp_flow_wildcards()\
-                        /of.ofp_match(in_port=pkt_in_msg.in_port,
-                                      dl_src=pkt_parsed.src,
-                                      dl_dst=pkt_parsed.dst,
-                                      dl_type=pkt_parsed.type,
-                                      nw_tos=pkt_parsed.payload.tos,
-                                      nw_proto=pkt_parsed.payload.proto,
-                                      nw_src=pkt_parsed.payload.src,
-                                      nw_dst=pkt_parsed.payload.dst,
-                                      tp_src = pkt_parsed.payload.payload.type,
-                                      tp_dst = pkt_parsed.payload.payload.code)\
-                        /of.ofp_flow_mod(cookie=cookie,
-                                         command=0,
-                                         idle_timeout=60,
-                                         buffer_id=pkt_in_msg.buffer_id,#icmp type 8: request, 0: reply
-                                         flags=1)\
-                        /of.ofp_action_output(type=0, 
-                                              port=0xfffb,
-                                              len=8)"""
                                               
                         flow_mod_msg = of.ofp_header(type=14,
                                                      length=88,
@@ -296,29 +250,7 @@ def client_handler(address, fd, events):
                         #    flow_mod_msg = flow_mod_msg/of.ofp_action_output(type=0, port=0xfffb, len=8)/of.ofp_action_header(type=3)
                         
                         #flow_mod_msg.show()
-                        """global ofp_match_obj
-                        ofp_match_obj = of.ofp_match(in_port=pkt_in_msg.in_port,
-                                      dl_src=pkt_parsed.src,
-                                      dl_dst=pkt_parsed.dst,
-                                      dl_type=pkt_parsed.type,
-                                      nw_tos=pkt_parsed.payload.tos,
-                                      nw_proto=pkt_parsed.payload.proto,
-                                      nw_src=pkt_parsed.payload.src,
-                                      nw_dst=pkt_parsed.payload.dst,
-                                      tp_src = pkt_parsed.payload.payload.type,
-                                      tp_dst = pkt_parsed.payload.payload.code)"""
                         
-                        """
-                        
-                        print "--------------------------------------------------------------------------------------"
-                        print "len of flow_mod_msg        :", len(str(flow_mod_msg))
-                        print "len of of_header()         :", len(str(of.ofp_header()))
-                        print "len of ofp_flow_wildcards():", len(str(of.ofp_flow_wildcards()))
-                        print "len of ofp_match()         :", len(str(of.ofp_match()))
-                        print "len of ofp_flow_mod()      :", len(str(of.ofp_flow_mod(command=0,idle_timeout=60,buffer_id=pkt_in_msg.buffer_id)))
-                        print "len of ofp_action_output() :", len(str(of.ofp_action_output(type=0,port=0xfffb,len=8)))
-                        print "--------------------------------------------------------------------------------------"
-                        """
                         io_loop.update_handler(fd, io_loop.WRITE)
                         #message_queue_map[sock].put(str(pkt_out))
                         message_queue_map[sock].put(str(flow_mod_msg))

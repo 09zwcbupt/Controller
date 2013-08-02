@@ -45,6 +45,7 @@ class switch():
         self.fd_con     = sock_con.fileno()
         self.queue_con  = Queue.Queue()
         self.queue_sw   = Queue.Queue()
+        self.buffer     = {}
         
     def controller_handler(self, address, fd, events):
         if events & io_loop.READ:
@@ -56,9 +57,17 @@ class switch():
                 self.sock_sw.close()
                 io_loop.remove_handler(self.fd_sw)
             else:
-                rmsg = of.ofp_header(data)
+                rmsg = of.ofp_header(data[0:8])
                 # Here, we can manipulate OpenFlow packets from CONTROLLER.
-                rmsg.show()
+                #rmsg.show()
+                if rmsg.type == 14:
+                    #print "packet out/flow mod"
+                    header = of.ofp_header(data[0:8])
+                    wildcards = of.ofp_flow_wildcards(data[8:12])
+                    match = of.ofp_match(data[12:48])
+                    flow_mod = of.ofp_flow_mod(data[48:])
+                    #print flow_mod.buffer_id, flow_mod.buffer_id == self.buffer[match.in_port]
+                
                 io_loop.update_handler(self.fd_sw, io_loop.WRITE)
                 self.queue_sw.put(str(data))
     
@@ -70,7 +79,7 @@ class switch():
                 #print "%s queue empty" % str(address)
                 io_loop.update_handler(self.fd_con, io_loop.READ)
             else:
-                print 'sending "%s" to %s' % (of.ofp_type[of.ofp_header(next_msg).type], self.sock_con.getpeername())
+                #print 'sending "%s" to %s' % (of.ofp_type[of.ofp_header(next_msg).type], self.sock_con.getpeername())
                 self.sock_con.send(next_msg)
 
     def switch_handler(self, address, fd, events):
@@ -84,7 +93,21 @@ class switch():
                 io_loop.remove_handler(self.fd_con)
             else:
                 rmsg = of.ofp_header(data)
-                rmsg.show()
+                #rmsg.show()
+                if rmsg.type == 10:
+                    #print "Packet In"
+                    pkt_in_msg = of.ofp_packet_in(data[8:18])
+                    #pkt_in_msg.show()
+                    pkt_parsed = of.Ether(data[18:])
+                    #pkt_parsed.show()
+                    if isinstance(pkt_parsed.payload, of.IP) or isinstance(pkt_parsed.payload.payload, of.IP):
+                        if isinstance(pkt_parsed.payload.payload, of.ICMP):
+                            self.buffer[pkt_in_msg.in_port] = pkt_in_msg.buffer_id # bind buffer id with in port 
+                            #print "ping", self.buffer  
+                        elif isinstance(pkt_parsed.payload.payload.payload, of.ICMP):
+                            self.buffer[pkt_in_msg.in_port] = pkt_in_msg.buffer_id # bind buffer id with in port 
+                            #print "ping", self.buffer
+                    
                 # Here, we can manipulate OpenFlow packets from SWITCH.
                 io_loop.update_handler(self.fd_con, io_loop.WRITE)
                 self.queue_con.put(str(data))
@@ -96,7 +119,7 @@ class switch():
                 #print "%s queue empty" % str(address)
                 io_loop.update_handler(self.fd_sw, io_loop.READ)
             else:
-                print 'sending "%s" to %s' % (of.ofp_type[of.ofp_header(next_msg).type], self.sock_sw.getpeername())
+                #print 'sending "%s" to %s' % (of.ofp_type[of.ofp_header(next_msg).type], self.sock_sw.getpeername())
                 self.sock_sw.send(next_msg)
 
 """
@@ -128,7 +151,7 @@ def agent(sock, fd, events):
     #no idea why, but when not blocking, it says: error: [Errno 36] Operation now in progress
     sock_control = new_sock(1)
     try:
-        sock_control.connect(("10.2.30.198",6633))#controller's IP, better change it into an argument
+        sock_control.connect(("10.2.31.80",6633))#controller's IP, better change it into an argument
     except socket.error, e:
         if e.args[0] not in (errno.ECONNREFUSED, errno.EINPROGRESS):
             raise
