@@ -76,13 +76,17 @@ def ofc2of(msg, buffer, dpid):
                                                         buffer_id=buffer_id,#icmp type 8: request, 0: reply
                                                         flags=1)
                         
+                        if msg.payload.payload.payload.nport_out:
+                            port = msg.payload.payload.payload.nport_out
+                        elif msg.payload.payload.payload.wport_out:
+                            port = msg.payload.payload.payload.wport_out
                         if (not isinstance(pkt_parsed.payload, of.IP)) and pkt_parsed.payload.src =="10.0.0.1" and dpid == 2: # have VLAN and from node 2 -> 1 @s2 (rm vlan)
                             print "1->2 @s2"
-                            flow_mod_msg = flow_mod_msg/of.ofp_action_header(type=3)/of.ofp_action_output(type=0, port=0xfffb, len=8)
+                            flow_mod_msg = flow_mod_msg/of.ofp_action_header(type=3)/of.ofp_action_output(type=0, port=port, len=8)
                         
                         elif (not isinstance(pkt_parsed.payload, of.IP)) and pkt_parsed.payload.src =="10.0.0.2" and dpid == 1: # have VLAN and from node 2 -> 1 (rm vlan)
                             print "1<-2 @s1"
-                            flow_mod_msg = flow_mod_msg/of.ofp_action_header(type=3)/of.ofp_action_output(type=0, port=0xfffb, len=8)
+                            flow_mod_msg = flow_mod_msg/of.ofp_action_header(type=3)/of.ofp_action_output(type=0, port=port, len=8)
                         
                         #flow_mod_msg.show()
                         return flow_mod_msg
@@ -107,16 +111,22 @@ def ofc2of(msg, buffer, dpid):
                                                         hard_timeout=60,
                                                         buffer_id=buffer_id,#icmp type 8: request, 0: reply
                                                         flags=1)
-                                       
+                        
+                        if msg.payload.payload.payload.nport_out:
+                            vid =  ofc2of_dict_odu[msg.payload.payload.payload.sup_otn_port_bandwidth_out](msg.payload.payload.payload.supp_sw_otn_gran_out)
+                            port = msg.payload.payload.payload.nport_out
+                        elif msg.payload.payload.payload.wport_out:
+                            vid =  ofc2of_dict_wave(msg.payload.payload.payload.num_wave_out)
+                            port = msg.payload.payload.payload.wport_out
                         # h1 -> (add vlan)of_switch(rm vlan) -> h2
                         if isinstance(pkt_parsed.payload, of.IP) and pkt_parsed.payload.src == "10.0.0.1" and dpid == 1: # not VLAN and from node 1 -> 2 @s1(add vlan)
                             print "1->2 @s1"
-                            flow_mod_msg = flow_mod_msg/of.ofp_action_vlan_vid(vlan_vid = 100)/of.ofp_action_output(type=0, port=0xfffb, len=8)                            
+                            flow_mod_msg = flow_mod_msg/of.ofp_action_vlan_vid(vlan_vid = vid)/of.ofp_action_output(type=0, port=port, len=8)                            
                         
                         # h1 <- (rm vlan)of_switch(add vlan) <- h2
                         elif isinstance(pkt_parsed.payload, of.IP) and pkt_parsed.payload.src == "10.0.0.2" and dpid == 2: # not VLAN and from node 1 -> 2 @s2(add vlan)
                             print "1<-2 @s2"
-                            flow_mod_msg = flow_mod_msg/of.ofp_action_vlan_vid(vlan_vid = 200)/of.ofp_action_output(type=0, port=0xfffb, len=8)
+                            flow_mod_msg = flow_mod_msg/of.ofp_action_vlan_vid(vlan_vid = vid)/of.ofp_action_output(type=0, port=port, len=8)
                         #flow_mod_msg.show()
                         return flow_mod_msg
                             

@@ -101,7 +101,7 @@ def client_handler(address, fd, events):
                 if isinstance(pkt_parsed.payload, of.IP) or isinstance(pkt_parsed.payload.payload, of.IP):
                     if isinstance(pkt_parsed.payload.payload.payload, of.ICMP) or isinstance(pkt_parsed.payload.payload, of.ICMP):
                         cflow_mod = of.ofp_header(type=14, xid=rmsg.xid)\
-                                    /of.ofp_cflow_mod()\
+                                    /of.ofp_cflow_mod(command=0)\
                                     /of.ofp_connect_wildcards()\
                                     /of.ofp_connect(in_port = pkt_in_msg.in_port)\
                                     /of.ofp_action_output(type=0, port=0xfffb, len=8)
