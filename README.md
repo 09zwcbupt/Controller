@@ -10,15 +10,14 @@ Also, this is an experimental project for Wang jian, kimi Yang and me. Our goals
 
 So, instead of performance (not able to do so), we focus on the functionality of a controller.
 
-   CATR Controller -+- Architecture -+- Overall
-                    |                |
-                    |                +- Step by step -+- Tornado & Echo Server
-                    |                                 |
-                    |                                 +- Scapy & OpenFlow lib
-                    +- Detailed Design -+- TCP Server
-                    |                   |
-                    |                   +- OpenFlow Library
-                    |                   |
-                    |                   +- Event System
-                    +- Idea List
-
+     CATR Controller -+- Architecture -+- Overall  
+                      |                |  
+                      |                +- Step by step -+- Tornado & Echo Server  
+                      |                                 |  
+                      |                                 +- Scapy & OpenFlow lib  
+                      +- Detailed Design -+- TCP Server  
+                      |                   |  
+                      |                   +- OpenFlow Library  
+                      |                   |  
+                      |                   +- Event System  
+                      +- Idea List  
