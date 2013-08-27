@@ -9,6 +9,7 @@ Also, this is an experimental project for Wang jian, kimi Yang and me. Our goals
     · And everything we would come up with
 
 So, instead of performance (not able to do so), we focus on the functionality of a controller.
+Below is the structure of this document:
 
      CATR Controller -+- Architecture -+- Overall  
                       |                |  
@@ -21,3 +22,7 @@ So, instead of performance (not able to do so), we focus on the functionality of
                       |                   |  
                       |                   +- Event System  
                       +- Idea List  
+
+Archticture
+-----------
+
