@@ -23,6 +23,7 @@ Below is the structure of this document:
                       |                   +- Event System  
                       +- Idea List  
 
-Archticture
------------
-
+Architecture
+------------
+###Overall
+The CATR Controller is first started as a testing tool for the OpenFlow cricuit extension project in CATR of MIIT.
