@@ -27,8 +27,11 @@ Architecture
 ------------
 ###Overall
 The CATR Controller is first started as a testing tool for the OpenFlow cricuit extension project in CATR of MIIT.  
-This is a pic of current architecture:
-![Arch](http://richardzhao.me/wp-content/uploads/2013/08/arch.png)
+This is a pic of current architecture:  
+![Arch](http://richardzhao.me/wp-content/uploads/2013/08/archi.png)  
 It has three layers. The bottom one is the TCP Server, handling TCP connections started from OpenFlow Switches.  
 The second one is a Openflow library which will parse upcomming messages and pack message to switches.
 And the third layer is processing logic.
+
+###Step by step
+As shown in the previous picture. The bottom of CATR Controller is a TCP server using IOLoop in tornado.
